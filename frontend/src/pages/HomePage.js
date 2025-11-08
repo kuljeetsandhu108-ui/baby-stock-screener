@@ -87,7 +87,7 @@ const HomePage = () => {
       setError('');
       try {
         // Call our backend's AI-powered search endpoint
-        const response = await axios.get(`http://localhost:8000/api/stocks/search?query=${query}`);
+        const response = await axios.get(`/api/stocks/search?query=${query}`);
         const symbol = response.data.symbol;
         // Navigate to the detail page for the found symbol
         navigate(`/stock/${symbol}`);

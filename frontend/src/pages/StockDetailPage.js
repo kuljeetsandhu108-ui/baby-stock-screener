@@ -93,7 +93,7 @@ const StockDetailPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await axios.get(`http://localhost:8000/api/stocks/${symbol}/all`);
+        const response = await axios.get(`/api/stocks/${symbol}/all`);
         setStockData(response.data);
       } catch (err) {
         setError(`Could not retrieve data for ${symbol}. Please check the symbol and try again.`);
