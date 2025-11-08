@@ -1,5 +1,5 @@
 # Tell Railway to install both Python and Node.js version 18
-providers = ["python", "node@18"]
+providers = ["python", "nodejs@18"]
 
 [phases.install]
 # This command installs all our libraries.
