@@ -1,0 +1,14 @@
+# This tells Railway what programming languages to install on the server.
+providers = ["python", "node@18"]
+
+[phases.install]
+# This command installs all our libraries.
+cmds = ["npm --prefix frontend install", "pip install -r backend/requirements.txt"]
+
+[phases.build]
+# This command builds our React app for production.
+cmds = ["npm --prefix frontend run build"]
+
+[start]
+# This command starts our Python web server.
+cmd = "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
