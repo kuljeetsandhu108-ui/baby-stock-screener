@@ -15,7 +15,6 @@ import { Tabs, TabPanel } from '../components/common/Tabs/Tabs';
 import Forecasts from '../components/Forecasts/Forecasts';
 import Fundamentals from '../components/Fundamentals/Fundamentals';
 
-
 // --- (All styled components are unchanged) ---
 const fadeIn = keyframes`from {opacity: 0;} to {opacity: 1;}`;
 const StockDetailPageContainer = styled.div`padding: 2rem 3rem; max-width: 1800px; margin: 0 auto; animation: ${fadeIn} 0.5s ease-in;`;
@@ -74,7 +73,6 @@ const StockDetailPage = () => {
               />
             </LeftColumn>
             <RightColumn>
-              {/* --- ADDING DELAY PROP --- */}
               <SwotAnalysis symbol={symbol} profile={stockData.profile} delay={100} />
               <NewsList newsArticles={stockData.news} />
             </RightColumn>
@@ -82,13 +80,16 @@ const StockDetailPage = () => {
         </TabPanel>
         
         <TabPanel label="Fundamentals">
-            {/* --- ADDING DELAY PROP --- */}
             <Fundamentals
                 symbol={symbol}
-                profile={stockData.profile}
-                keyMetrics={stockData.key_metrics}
-                piotroskiData={stockData.piotroski_f_score}
-                delay={300} 
+    profile={stockData.profile}
+    quote={stockData.quote}
+    keyMetrics={stockData.key_metrics}
+    piotroskiData={stockData.piotroski_f_score}
+    quarterlyEarnings={stockData.quarterly_income_statements}
+    annualEarnings={stockData.annual_revenue_and_profit}
+    shareholding={stockData.shareholding}
+    delay={300} 
             />
         </TabPanel>
 
@@ -101,7 +102,6 @@ const StockDetailPage = () => {
         </TabPanel>
         
         <TabPanel label="Forecasts">
-            {/* --- ADDING DELAY PROP --- */}
             <Forecasts 
                 symbol={symbol}
                 quote={stockData.quote}
@@ -113,8 +113,12 @@ const StockDetailPage = () => {
             />
         </TabPanel>
         
+        {/* --- THIS IS THE UPDATED PART --- */}
         <TabPanel label="Shareholding">
-            <Shareholding shareholdingData={stockData.shareholding} />
+            <Shareholding 
+                shareholdingData={stockData.shareholding}
+                historicalStatements={stockData.annual_revenue_and_profit}
+            />
         </TabPanel>
         
         <TabPanel label="Technicals">

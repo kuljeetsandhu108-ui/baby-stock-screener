@@ -9,7 +9,6 @@ def get_historical_data(symbol: str, period: str = "1y", interval: str = "1d"):
     """
     try:
         ticker = yf.Ticker(symbol)
-        # Fetch the historical market data
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
@@ -41,10 +40,8 @@ def calculate_technical_indicators(df: pd.DataFrame):
         df.ta.willr(length=14, append=True)
         df.ta.bbands(length=20, std=2, append=True)
         
-        # Get the very last row, which contains the most recent indicator values
         latest_indicators = df.iloc[-1]
 
-        # Structure the data into a clean dictionary that our frontend component expects
         return {
             "rsi": latest_indicators.get('RSI_14'),
             "macd": latest_indicators.get('MACD_12_26_9'),
@@ -65,7 +62,7 @@ def calculate_technical_indicators(df: pd.DataFrame):
 
 def get_analyst_recommendations(symbol: str):
     """
-    Fetches analyst recommendation data from Yahoo Finance.
+    Fetches analyst recommendation data (strong buy, buy, hold, etc.) from Yahoo Finance.
     """
     try:
         ticker = yf.Ticker(symbol)
@@ -88,7 +85,7 @@ def get_analyst_recommendations(symbol: str):
 
 def get_price_target_data(symbol: str):
     """
-    Fetches price target data from Yahoo Finance's analysis info.
+    Fetches price target data (high, low, average) from Yahoo Finance's analysis info.
     """
     try:
         ticker = yf.Ticker(symbol)
@@ -105,3 +102,74 @@ def get_price_target_data(symbol: str):
     except Exception as e:
         print(f"Error fetching yfinance price target for {symbol}: {e}")
         return {}
+
+def get_key_fundamentals(symbol: str):
+    """
+    This is our fallback function. It gets essential metrics
+    directly from Yahoo Finance's reliable .info dictionary.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+
+        trailing_eps = info.get('trailingEps')
+        market_price = info.get('regularMarketPrice')
+        
+        earnings_yield = None
+        if trailing_eps is not None and market_price is not None and market_price != 0:
+            earnings_yield = trailing_eps / market_price
+        
+        roe = info.get('returnOnEquity')
+
+        print(f"Yahoo Fallback: PE={info.get('trailingPE')}, EY={earnings_yield}, ROE={roe}")
+
+        return {
+            "peRatioTTM": info.get('trailingPE'),
+            "earningsYieldTTM": earnings_yield,
+            "returnOnCapitalEmployedTTM": roe,
+        }
+    except Exception as e:
+        print(f"Error fetching yfinance key fundamentals for {symbol}: {e}")
+        return {}
+
+def get_historical_financials(symbol: str):
+    """
+    Fetches historical Income Statements, Balance Sheets, and Cash Flow statements
+    from Yahoo Finance. This is our robust fallback for Piotroski calculations.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        
+        # Fetch annual data
+        income_stmt_raw = ticker.financials
+        balance_sheet_raw = ticker.balance_sheet
+        cash_flow_raw = ticker.cashflow
+
+        # Transpose to have dates as rows and select latest 3 years
+        income_stmt = income_stmt_raw.transpose().reset_index().head(3)
+        balance_sheet = balance_sheet_raw.transpose().reset_index().head(3)
+        cash_flow = cash_flow_raw.transpose().reset_index().head(3)
+
+        # --- Standardize the data to match the FMP API format ---
+        # This is the "intelligence" that makes merging seamless.
+        
+        # Rename columns and format date. Use .get() to avoid errors on missing columns.
+        income_stmt.rename(columns={'index': 'date', 'Net Income': 'netIncome', 'Total Revenue': 'revenue', 'Gross Profit': 'grossProfit', 'sharesIssued': 'weightedAverageShsOut'}, inplace=True)
+        balance_sheet.rename(columns={'index': 'date', 'Total Assets': 'totalAssets', 'Long Term Debt': 'longTermDebt', 'Total Current Assets': 'totalCurrentAssets', 'Total Current Liabilities': 'totalCurrentLiabilities'}, inplace=True)
+        cash_flow.rename(columns={'index': 'date', 'Operating Cash Flow': 'operatingCashFlow'}, inplace=True)
+        
+        # Convert Timestamps to string format 'YYYY-MM-DD'
+        if 'date' in income_stmt.columns: income_stmt['date'] = income_stmt['date'].astype(str)
+        if 'date' in balance_sheet.columns: balance_sheet['date'] = balance_sheet['date'].astype(str)
+        if 'date' in cash_flow.columns: cash_flow['date'] = cash_flow['date'].astype(str)
+
+        # Convert DataFrames to a list of dictionaries, which is what our calculator expects
+        return {
+            "income": income_stmt.to_dict('records'),
+            "balance": balance_sheet.to_dict('records'),
+            "cash_flow": cash_flow.to_dict('records'),
+        }
+
+    except Exception as e:
+        print(f"Error fetching yfinance historical financials for {symbol}: {e}")
+        return {"income": [], "balance": [], "cash_flow": []}

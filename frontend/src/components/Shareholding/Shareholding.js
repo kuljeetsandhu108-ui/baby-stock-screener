@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import Card from '../common/Card';
 import DonutChart from './DonutChart';
 import TrendChart from './TrendChart';
+import OwnershipTrend from './OwnershipTrend';
 
 // --- Styled Components ---
 
@@ -31,11 +32,12 @@ const SectionTitle = styled.h3`
     margin-bottom: 2rem;
 `;
 
-// --- React Component ---
+// --- The Upgraded React Component ---
 
-const Shareholding = ({ shareholdingData }) => {
+// It now accepts 'historicalStatements' instead of 'historicalOwnership'
+const Shareholding = ({ shareholdingData, historicalStatements }) => {
 
-  // Defensive check: If data is missing or empty, show a message instead of the charts.
+  // Defensive check: If there's no current shareholding data, show a message.
   if (!shareholdingData || !Array.isArray(shareholdingData) || shareholdingData.length === 0) {
     return (
       <Card title="Shareholding">
@@ -45,22 +47,23 @@ const Shareholding = ({ shareholdingData }) => {
   }
 
   return (
-    // We use our reusable Card component with a title
     <Card title="Shareholding">
+      {/* --- This top section for summary charts is unchanged --- */}
       <GridContainer>
-        
-        {/* Left Column: Summary Donut Chart */}
         <ChartContainer>
           <SectionTitle>Summary</SectionTitle>
           <DonutChart data={shareholdingData} />
         </ChartContainer>
-
-        {/* Right Column: Trend Bar Chart */}
         <ChartContainer>
            <TrendChart />
         </ChartContainer>
-
       </GridContainer>
+
+      {/* --- THIS IS THE UPDATED PART --- */}
+      {/* We now pass the 'historicalStatements' prop to our new OwnershipTrend component. */}
+      {/* This component will now render the Shares Outstanding trend chart. */}
+      <OwnershipTrend historicalStatements={historicalStatements} />
+
     </Card>
   );
 };

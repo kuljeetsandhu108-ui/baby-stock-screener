@@ -2,7 +2,6 @@ import os
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables from the .env file in the `backend` directory
 load_dotenv()
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
@@ -87,10 +86,7 @@ def get_analyst_ratings(symbol: str, limit: int = 100):
         return []
 
 def get_shareholding_data(symbol: str, limit: int = 100):
-    """
-    Fetches institutional shareholding data from FMP.
-    This will be used to create the shareholding pattern charts.
-    """
+    """Fetches the current list of institutional shareholders from FMP."""
     if not FMP_API_KEY:
         return {"error": "FMP API key not found."}
     try:
@@ -101,59 +97,59 @@ def get_shareholding_data(symbol: str, limit: int = 100):
     except requests.exceptions.RequestException as e:
         print(f"Error fetching shareholding data for {symbol}: {e}")
         return []
-
-# --- NEW FUNCTION ADDED HERE ---
-def get_technical_indicators(symbol: str, period: int = 14):
-    """
-    Fetches a wide range of daily technical indicators from FMP.
-    """
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
-    try:
-        # The FMP endpoint provides a rich set of indicators for the daily timeframe.
-        url = f"{BASE_URL}/technical_indicator/daily/{symbol}?period={period}&apikey={FMP_API_KEY}"
-        response = requests.get(url)
-        response.raise_for_status()
-        # We only need the most recent indicator values, which is the first item in the array.
-        return response.json()[0] if response.json() else {}
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching technical indicators for {symbol}: {e}")
-        return {}
-# (Keep all the existing functions like get_company_profile, get_quote, etc.)
-
-# --- ADD THIS NEW FUNCTION AT THE END OF THE FILE ---
-
+    
 def get_analyst_estimates(symbol: str, limit: int = 1):
-    """
-    Fetches analyst earnings estimates for the upcoming quarter from FMP.
-    """
+    """Fetches analyst earnings estimates for the upcoming quarter from FMP."""
     if not FMP_API_KEY:
         return {"error": "FMP API key not found."}
     try:
         url = f"{BASE_URL}/analyst-estimates/{symbol}?limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
-        # Return the most recent estimate, which is the first item
         return response.json()[0] if response.json() else {}
     except requests.exceptions.RequestException as e:
         print(f"Error fetching analyst estimates for {symbol}: {e}")
         return {}
-# (Keep all the existing functions)
-
-# --- ADD THIS NEW FUNCTION AT THE END OF THE FILE ---
 
 def get_price_target_consensus(symbol: str):
-    """
-    Fetches the price target consensus (high, low, average) from FMP.
-    """
+    """Fetches the price target consensus (high, low, average) from FMP."""
     if not FMP_API_KEY:
         return {"error": "FMP API key not found."}
     try:
         url = f"{BASE_URL}/price-target-consensus/{symbol}?apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
-        # The API returns a list, we only need the first (and only) item.
         return response.json()[0] if response.json() else {}
     except requests.exceptions.RequestException as e:
         print(f"Error fetching price target consensus for {symbol}: {e}")
         return {}
+
+def get_technical_indicators(symbol: str, period: int = 14):
+    """Fetches a wide range of daily technical indicators from FMP."""
+    if not FMP_API_KEY:
+        return {"error": "FMP API key not found."}
+    try:
+        url = f"{BASE_URL}/technical_indicator/daily/{symbol}?period={period}&apikey={FMP_API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()[0] if response.json() else {}
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching technical indicators for {symbol}: {e}")
+        return {}
+
+def get_historical_institutional_ownership(symbol: str, limit: int = 8):
+    """
+    Fetches the quarterly historical ownership data for institutional investors.
+    This is the data source for our new FII Buying trend chart.
+    """
+    if not FMP_API_KEY:
+        return {"error": "FMP API key not found."}
+    try:
+        # This endpoint provides aggregated totals for institutional ownership over time.
+        url = f"{BASE_URL}/institutional-ownership/symbol-ownership?symbol={symbol}&include_current_quarter=true&limit={limit}&apikey={FMP_API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching historical institutional ownership for {symbol}: {e}")
+        return []
