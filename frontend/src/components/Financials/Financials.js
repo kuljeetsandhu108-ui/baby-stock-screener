@@ -6,6 +6,8 @@ import Card from '../common/Card';
 import RevenueChart from './RevenueChart';
 import KeyStats from './KeyStats';
 import AboutCompany from './AboutCompany';
+// --- NEW: Import our new Balance Sheet component ---
+import BalanceSheet from './BalanceSheet';
 
 // --- Styled Components ---
 
@@ -17,8 +19,8 @@ const FinancialsContainer = styled.div`
 
 // --- The Refactored React Component ---
 
-const Financials = ({ profile, quote, keyMetrics, keyStats, financialData }) => {
-  // Defensive check: If we don't have the core profile data, show a generic message.
+// It now accepts the new 'balanceSheetData' prop
+const Financials = ({ profile, keyStats, financialData, balanceSheetData }) => {
   if (!profile) {
     return (
       <Card>
@@ -28,21 +30,23 @@ const Financials = ({ profile, quote, keyMetrics, keyStats, financialData }) => 
   }
 
   return (
-    // We use a single, borderless Card for a cleaner, integrated look within the tab
     <Card>
       <FinancialsContainer>
 
-        {/* --- Section 1: Key Stats --- */}
-        {/* Pass the consolidated keyStats object we created in the backend */}
+        {/* --- Section 1: Key Stats (Unchanged) --- */}
         <KeyStats stats={keyStats} />
+        
+        {/* --- Section 2: Balance Sheet (NEW!) --- */}
+        {/* We add our new component here, passing the balance sheet data down to it */}
+        <BalanceSheet balanceSheetData={balanceSheetData} />
 
-        {/* --- Section 2: Financials Overview Chart --- */}
+        {/* --- Section 3: Financials Overview Chart (Unchanged) --- */}
         <div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem' }}>Financials Overview</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1.5rem' }}>Income Statement (5-Year Trend)</h3>
             <RevenueChart data={financialData} />
         </div>
 
-        {/* --- Section 3: About the Company --- */}
+        {/* --- Section 4: About the Company (Unchanged) --- */}
         <AboutCompany profile={profile} />
 
       </FinancialsContainer>

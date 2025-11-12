@@ -244,7 +244,8 @@ const StockDetailPage = () => {
           <Financials 
             profile={stockData.profile}
             keyStats={stockData.keyStats}
-            financialData={stockData.annual_revenue_and_profit} 
+            financialData={stockData.annual_revenue_and_profit}
+            balanceSheetData={stockData.annual_balance_sheets}
           />
         </TabPanel>
         
