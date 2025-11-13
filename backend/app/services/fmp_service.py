@@ -138,18 +138,39 @@ def get_technical_indicators(symbol: str, period: int = 14):
         return {}
 
 def get_historical_institutional_ownership(symbol: str, limit: int = 8):
-    """
-    Fetches the quarterly historical ownership data for institutional investors.
-    This is the data source for our new FII Buying trend chart.
-    """
+    """Fetches the quarterly historical ownership data for institutional investors."""
     if not FMP_API_KEY:
         return {"error": "FMP API key not found."}
     try:
-        # This endpoint provides aggregated totals for institutional ownership over time.
         url = f"{BASE_URL}/institutional-ownership/symbol-ownership?symbol={symbol}&include_current_quarter=true&limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching historical institutional ownership for {symbol}: {e}")
+        return []
+
+def get_peers_with_metrics(symbols: list):
+    """
+    This is now a utility function. It takes a LIST of symbols
+    and fetches key metrics for all of them in a single, efficient batch call.
+    """
+    if not FMP_API_KEY:
+        return {"error": "FMP API key not found."}
+    if not symbols:
+        return []
+        
+    try:
+        # The FMP API allows for comma-separated symbols for high efficiency.
+        symbols_str = ",".join(symbols)
+        
+        # We use the key-metrics-ttm endpoint to get the latest trailing-twelve-months data.
+        metrics_url = f"{BASE_URL}/key-metrics-ttm/{symbols_str}?apikey={FMP_API_KEY}"
+        metrics_response = requests.get(metrics_url)
+        metrics_response.raise_for_status()
+        
+        return metrics_response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching peers metrics for symbols {symbols_str}: {e}")
         return []

@@ -15,6 +15,7 @@ import { Tabs, TabPanel } from '../components/common/Tabs/Tabs';
 import Forecasts from '../components/Forecasts/Forecasts';
 import Fundamentals from '../components/Fundamentals/Fundamentals';
 import OverallSentiment from '../components/Sentiment/OverallSentiment';
+import PeersComparison from '../components/Peers/PeersComparison';
 
 // --- Styled Components for the page layout ---
 
@@ -244,7 +245,7 @@ const StockDetailPage = () => {
           <Financials 
             profile={stockData.profile}
             keyStats={stockData.keyStats}
-            financialData={stockData.annual_revenue_and_profit}
+            financialData={stockData.annual_revenue_and_profit} 
             balanceSheetData={stockData.annual_balance_sheets}
           />
         </TabPanel>
@@ -259,6 +260,10 @@ const StockDetailPage = () => {
                 news={stockData.news}
                 delay={200}
             />
+        </TabPanel>
+
+        <TabPanel label="Peers">
+            <PeersComparison symbol={symbol} />
         </TabPanel>
         
         <TabPanel label="Shareholding">

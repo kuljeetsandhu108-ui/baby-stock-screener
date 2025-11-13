@@ -6,18 +6,13 @@ import itertools
 load_dotenv()
 
 # --- THE API KEY ROTATOR ---
-# This block initializes our load balancing system for the Gemini API.
 try:
-    # 1. Read the comma-separated string of keys from the .env file.
     GEMINI_API_KEYS_STR = os.getenv("GEMINI_API_KEYS")
     if not GEMINI_API_KEYS_STR:
         raise ValueError("GEMINI_API_KEYS not found in .env file. Please add it as a comma-separated list.")
     
-    # 2. Split the string into a clean list of individual keys.
     GEMINI_API_KEYS = [key.strip() for key in GEMINI_API_KEYS_STR.split(',')]
     
-    # 3. Create an infinitely looping iterator that cycles through our list of keys.
-    # This is the core of the load balancer.
     key_cycler = itertools.cycle(GEMINI_API_KEYS)
     print(f"Successfully loaded and initialized rotator for {len(GEMINI_API_KEYS)} Gemini API keys.")
 
@@ -27,26 +22,22 @@ except (ValueError, AttributeError) as e:
     key_cycler = None
 
 def configure_gemini_for_request():
-    """
-    This function is called before every API request. It takes the next key
-    from the pool and configures the genai library with it.
-    """
+    """Configures the genai library with the next available key from the pool."""
     if not key_cycler:
         raise ValueError("No Gemini API keys are configured or available.")
     
     api_key = next(key_cycler)
-    # print(f"Using API Key ending in: ...{api_key[-4:]}") # Optional: Uncomment for deep debugging
     genai.configure(api_key=api_key)
 
 
-# --- All functions below are now wrapped to use the rotator ---
+# --- All functions are wrapped to use the rotator ---
 
 def get_ticker_from_query(query: str):
     """Uses the Gemini model with a rotated API key to find a stock ticker."""
     try:
         configure_gemini_for_request()
         model = genai.GenerativeModel('gemini-2.5-flash')
-        prompt = f"""Analyze the following user query: "{query}". Return ONLY the official stock ticker symbol (e.g., "AAPL", "RELIANCE.NS"). If none is found, return "NOT_FOUND"."""
+        prompt = f"""Analyze the following user query: "{query}". Return ONLY the official stock ticker symbol (e.g., "AAPL" for Apple, "RELIANCE.NS" for Reliance Industries). If a clear ticker cannot be found, return the text "NOT_FOUND"."""
         response = model.generate_content(prompt)
         return response.text.strip().replace("`", "").upper()
     except Exception as e:
@@ -59,7 +50,7 @@ def generate_swot_analysis(company_name: str, description: str, news_headlines: 
         configure_gemini_for_request()
         model = genai.GenerativeModel('gemini-2.5-flash')
         news_string = "\n- ".join(news_headlines)
-        prompt = f"""Generate a 4-section SWOT analysis for {company_name} based on this data:\nDescription: {description}\nRecent News:\n- {news_string}"""
+        prompt = f"""Generate a 4-section SWOT analysis for {company_name}. Use the following data for context. Structure the output with clear headers for Strengths, Weaknesses, Opportunities, and Threats, each followed by bullet points.\n\n**Company Description:**\n{description}\n\n**Recent News Headlines:**\n- {news_string}"""
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
@@ -71,9 +62,9 @@ def generate_forecast_analysis(company_name: str, analyst_ratings: list, price_t
     try:
         configure_gemini_for_request()
         model = genai.GenerativeModel('gemini-2.5-flash')
-        ratings_summary = "\n".join([f"- {r.get('ratingStrongBuy', 0)} Strong Buy, {r.get('ratingBuy', 0)} Buy, {r.get('ratingHold', 0)} Hold" for r in analyst_ratings[:1]])
+        ratings_summary = "\n".join([f"- {r.get('ratingStrongBuy', 0)} Strong Buy, {r.get('ratingBuy', 0)} Buy, {r.get('ratingHold', 0)} Hold, {r.get('ratingSell', 0)} Sell, {r.get('ratingStrongSell', 0)} Strong Sell" for r in analyst_ratings[:1]])
         news_string = "\n- ".join(news_headlines)
-        prompt = f"""Act as a financial analyst. For {company_name}, write a two-paragraph summary of the analyst forecast based on this data:\n- Ratings: {ratings_summary}\n- Price Target: High ${price_target.get('targetHigh')}, Avg ${price_target.get('targetConsensus')}\n- Recent News:\n- {news_string}"""
+        prompt = f"""Act as a professional financial analyst. For {company_name}, write a two-paragraph summary of the analyst forecast based on the following data:\n- **Analyst Ratings:** {ratings_summary}\n- **Price Target:** High ${price_target.get('targetHigh')}, Average ${price_target.get('targetConsensus')}, Low ${price_target.get('targetLow')}\n- **Recent News:**\n- {news_string}"""
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
@@ -81,22 +72,48 @@ def generate_forecast_analysis(company_name: str, analyst_ratings: list, price_t
         return "Could not generate AI forecast analysis."
 
 def generate_investment_philosophy_assessment(company_name: str, key_metrics: dict):
-    """Generates a philosophy assessment with a rotated API key."""
+    """
+    Generates a qualitative assessment, now robustly handling potentially missing data.
+    """
     try:
         configure_gemini_for_request()
         model = genai.GenerativeModel('gemini-2.5-flash')
-        pe_ratio = key_metrics.get('peRatioTTM')
-        earnings_yield = key_metrics.get('earningsYieldTTM')
-        roc = key_metrics.get('returnOnCapitalEmployedTTM')
-        if pe_ratio is None or earnings_yield is None or roc is None:
-            return "Could not generate assessment due to missing P/E, ROC, or Earnings Yield."
-        data_summary = f"- P/E Ratio: {pe_ratio:.2f}\n- Earnings Yield: {earnings_yield:.4f}\n- ROC: {roc:.4f}"
-        prompt = f"""Act as an analyst. For {company_name}, assess it against 3 philosophies (Magic Formula, Buffett, Coffee Can) based on these metrics:\n{data_summary}\nOutput a clean, 2-column Markdown table: "Formula", "Assessment", incorporating the values naturally."""
+        
+        # --- NEW RESILIENT DATA PREPARATION ---
+        # We now fetch each metric, providing 'N/A' as a default if it's missing.
+        pe_ratio = key_metrics.get('peRatioTTM', 'N/A')
+        earnings_yield = key_metrics.get('earningsYieldTTM', 'N/A')
+        roc = key_metrics.get('returnOnCapitalEmployedTTM', 'N/A')
+
+        # Format the data, handling cases where it might not be a number
+        data_summary = f"""
+        - Price to Earnings (P/E) Ratio: {pe_ratio if isinstance(pe_ratio, str) else f'{pe_ratio:.2f}'}
+        - Earnings Yield (E/P): {earnings_yield if isinstance(earnings_yield, str) else f'{earnings_yield:.4f}'}
+        - Return on Capital (ROC): {roc if isinstance(roc, str) else f'{roc:.4f}'}
+        """
+        
+        # --- NEW, MORE ROBUST PROMPT ---
+        prompt = f"""
+        Act as a financial analyst. Based on the following key metrics for {company_name}, provide a one-line qualitative assessment for each of the three investment philosophies.
+        The output must be a clean, two-column Markdown table with the headers: "Formula", "Assessment".
+        In your assessment, naturally incorporate the relevant metric values. If a metric is 'N/A', explicitly state that the data is missing for that part of the analysis.
+
+        **Key Metrics:**
+        {data_summary}
+
+        **Your Task:**
+        1.  **Magic Formula:** Based on the Earnings Yield and Return on Capital.
+        2.  **Warren Buffett:** Considering ROC and P/E.
+        3.  **Coffee Can:** Based on the ROC.
+
+        Generate the two-column Markdown table now.
+        """
+        
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        print(f"An error occurred in generate_investment_philosophy_assessment: {e}")
-        return "Could not generate AI assessment."
+        print(f"An error occurred while generating investment philosophy assessment: {e}")
+        return "Could not generate AI-powered assessment at this time."
 
 def generate_canslim_assessment(company_name: str, quote: dict, quarterly_earnings: list, annual_earnings: list, institutional_holders: int):
     """Generates a CANSLIM assessment with a rotated API key."""
@@ -106,32 +123,51 @@ def generate_canslim_assessment(company_name: str, quote: dict, quarterly_earnin
         
         c_growth, a_growth, is_new_high, is_high_demand = "N/A", "N/A", "No", "No"
         if len(quarterly_earnings) > 4:
-            latest_q_eps = quarterly_earnings[0].get('eps', 0)
-            previous_q_eps = quarterly_earnings[4].get('eps', 0)
-            if previous_q_eps not in [0, None]:
-                c_growth_val = ((latest_q_eps - previous_q_eps) / abs(previous_q_eps)) * 100
-                c_growth = f"{c_growth_val:.2f}% (YoY)"
+            latest_q_eps, previous_q_eps = quarterly_earnings[0].get('eps', 0), quarterly_earnings[4].get('eps', 0)
+            if previous_q_eps not in [0, None]: c_growth = f"{((latest_q_eps - previous_q_eps) / abs(previous_q_eps)) * 100:.2f}% (YoY)"
         if len(annual_earnings) >= 2:
-            latest_y_eps = annual_earnings[0].get('eps', 0)
-            previous_y_eps = annual_earnings[1].get('eps', 0)
-            if previous_y_eps not in [0, None]:
-                a_growth_val = ((latest_y_eps - previous_y_eps) / abs(previous_y_eps)) * 100
-                a_growth = f"{a_growth_val:.2f}%"
+            latest_y_eps, previous_y_eps = annual_earnings[0].get('eps', 0), annual_earnings[1].get('eps', 0)
+            if previous_y_eps not in [0, None]: a_growth = f"{((latest_y_eps - previous_y_eps) / abs(previous_y_eps)) * 100:.2f}%"
         price, year_high = quote.get('price'), quote.get('yearHigh')
         if price and year_high:
             percent_from_high = ((price - year_high) / year_high) * 100
-            if percent_from_high >= -15:
-                is_new_high = f"Yes, within {abs(percent_from_high):.2f}% of 52-week high"
+            if percent_from_high >= -15: is_new_high = f"Yes, within {abs(percent_from_high):.2f}% of 52-week high"
         volume, avg_volume = quote.get('volume'), quote.get('avgVolume')
         if volume and avg_volume and volume > avg_volume:
-            volume_increase = ((volume - avg_volume) / avg_volume) * 100
-            is_high_demand = f"Yes, volume is {volume_increase:.2f}% above average"
+            is_high_demand = f"Yes, volume is {((volume - avg_volume) / avg_volume) * 100:.2f}% above average"
         i_sponsorship = f"{institutional_holders} institutions hold this stock."
 
-        prompt = f"""Act as an analyst applying CANSLIM to {company_name}. Based *only* on the data, create a 7-point checklist. Output a 3-column Markdown table: "Criteria", "Assessment", "Result" (Pass/Fail/Neutral). DATA: C={c_growth}, A={a_growth}, N={is_new_high}, S={is_high_demand}, L=Infer leadership, I={i_sponsorship}, M=Infer market direction."""
+        prompt = f"""Act as an analyst applying CANSLIM to {company_name}. Based on the data, create a 7-point checklist. Output a 3-column Markdown table: "Criteria", "Assessment", "Result" (Pass/Fail/Neutral). DATA: C={c_growth}, A={a_growth}, N={is_new_high}, S={is_high_demand}, L=Infer leadership, I={i_sponsorship}, M=Infer market direction."""
         
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
         print(f"An error occurred in generate_canslim_assessment: {e}")
         return "Could not generate CANSLIM assessment."
+
+def find_peer_tickers_by_industry(company_name: str, sector: str, industry: str, country: str):
+    """
+    Uses Gemini AI to find a list of top 5 competitor tickers based on industry and country.
+    """
+    try:
+        configure_gemini_for_request()
+        model = genai.GenerativeModel('gemini-2.5-flash')
+
+        prompt = f"""
+        Act as an expert financial data analyst.
+        The company is {company_name}, in the "{industry}" industry within the "{sector}" sector in {country}.
+        Identify the top 5 publicly traded competitors in the same industry and country.
+        Return a single, comma-separated list of their stock ticker symbols ONLY.
+        - US: AAPL, MSFT
+        - India: RELIANCE.NS, TCS.NS
+        - Do not include the original company or any explanation.
+        Generate the list now.
+        """
+        response = model.generate_content(prompt)
+        
+        peers_str = response.text.strip().replace(" ", "").upper()
+        return peers_str.split(',')
+
+    except Exception as e:
+        print(f"An error occurred while finding peer tickers with AI: {e}")
+        return []

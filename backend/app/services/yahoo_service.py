@@ -9,6 +9,7 @@ def get_historical_data(symbol: str, period: str = "1y", interval: str = "1d"):
     """
     try:
         ticker = yf.Ticker(symbol)
+        # Fetch the historical market data
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
@@ -40,8 +41,10 @@ def calculate_technical_indicators(df: pd.DataFrame):
         df.ta.willr(length=14, append=True)
         df.ta.bbands(length=20, std=2, append=True)
         
+        # Get the very last row, which contains the most recent indicator values
         latest_indicators = df.iloc[-1]
 
+        # Structure the data into a clean dictionary that our frontend component expects
         return {
             "rsi": latest_indicators.get('RSI_14'),
             "macd": latest_indicators.get('MACD_12_26_9'),
@@ -105,13 +108,14 @@ def get_price_target_data(symbol: str):
 
 def get_key_fundamentals(symbol: str):
     """
-    This is our fallback function. It gets essential metrics
+    This is our ultimate fallback. It gets all equivalent metrics for our features
     directly from Yahoo Finance's reliable .info dictionary.
     """
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
 
+        # Calculate Earnings Yield = EPS / Price. Yahoo provides trailingEps.
         trailing_eps = info.get('trailingEps')
         market_price = info.get('regularMarketPrice')
         
@@ -119,14 +123,18 @@ def get_key_fundamentals(symbol: str):
         if trailing_eps is not None and market_price is not None and market_price != 0:
             earnings_yield = trailing_eps / market_price
         
+        # Return on Equity is a good proxy for Return on Capital
         roe = info.get('returnOnEquity')
-
-        print(f"Yahoo Fallback: PE={info.get('trailingPE')}, EY={earnings_yield}, ROE={roe}")
-
+        
+        # We now return a comprehensive dictionary with keys that our frontend can use.
         return {
+            "symbol": symbol, # Include symbol for merging purposes
             "peRatioTTM": info.get('trailingPE'),
             "earningsYieldTTM": earnings_yield,
             "returnOnCapitalEmployedTTM": roe,
+            "marketCap": info.get('marketCap'),
+            "revenueGrowth": info.get('revenueGrowth'),
+            "grossMargins": info.get('grossMargins'),
         }
     except Exception as e:
         print(f"Error fetching yfinance key fundamentals for {symbol}: {e}")
@@ -134,28 +142,23 @@ def get_key_fundamentals(symbol: str):
 
 def get_historical_financials(symbol: str):
     """
-    Fetches historical Income Statements, Balance Sheets, and Cash Flow statements
-    from Yahoo Finance. This is our robust fallback for Piotroski calculations.
+    Fetches historical financial statements from Yahoo Finance.
     """
     try:
         ticker = yf.Ticker(symbol)
         
-        # Fetch annual data
         income_stmt_raw = ticker.financials
         balance_sheet_raw = ticker.balance_sheet
         cash_flow_raw = ticker.cashflow
 
-        # Transpose to have dates as rows and select latest 3 years
-        income_stmt = income_stmt_raw.transpose().reset_index().head(3)
-        balance_sheet = balance_sheet_raw.transpose().reset_index().head(3)
+        # Transpose to have dates as rows and select latest 3-5 years
+        income_stmt = income_stmt_raw.transpose().reset_index().head(5)
+        balance_sheet = balance_sheet_raw.transpose().reset_index().head(5)
         cash_flow = cash_flow_raw.transpose().reset_index().head(3)
 
-        # --- Standardize the data to match the FMP API format ---
-        # This is the "intelligence" that makes merging seamless.
-        
-        # Rename columns and format date. Use .get() to avoid errors on missing columns.
-        income_stmt.rename(columns={'index': 'date', 'Net Income': 'netIncome', 'Total Revenue': 'revenue', 'Gross Profit': 'grossProfit', 'sharesIssued': 'weightedAverageShsOut'}, inplace=True)
-        balance_sheet.rename(columns={'index': 'date', 'Total Assets': 'totalAssets', 'Long Term Debt': 'longTermDebt', 'Total Current Assets': 'totalCurrentAssets', 'Total Current Liabilities': 'totalCurrentLiabilities'}, inplace=True)
+        # Rename columns to match the FMP API format for seamless merging
+        income_stmt.rename(columns={'index': 'date', 'Net Income': 'netIncome', 'Total Revenue': 'revenue', 'Gross Profit': 'grossProfit', 'Basic EPS': 'eps', 'Diluted EPS': 'epsdiluted', 'Shares Issued': 'weightedAverageShsOut'}, inplace=True)
+        balance_sheet.rename(columns={'index': 'date', 'Total Assets': 'totalAssets', 'Long Term Debt': 'longTermDebt', 'Total Current Assets': 'totalCurrentAssets', 'Total Current Liabilities': 'totalCurrentLiabilities', 'Total Stockholder Equity': 'totalStockholdersEquity'}, inplace=True)
         cash_flow.rename(columns={'index': 'date', 'Operating Cash Flow': 'operatingCashFlow'}, inplace=True)
         
         # Convert Timestamps to string format 'YYYY-MM-DD'
@@ -163,7 +166,7 @@ def get_historical_financials(symbol: str):
         if 'date' in balance_sheet.columns: balance_sheet['date'] = balance_sheet['date'].astype(str)
         if 'date' in cash_flow.columns: cash_flow['date'] = cash_flow['date'].astype(str)
 
-        # Convert DataFrames to a list of dictionaries, which is what our calculator expects
+        # Convert DataFrames to a list of dictionaries, which is what our calculators expect
         return {
             "income": income_stmt.to_dict('records'),
             "balance": balance_sheet.to_dict('records'),
@@ -173,3 +176,19 @@ def get_historical_financials(symbol: str):
     except Exception as e:
         print(f"Error fetching yfinance historical financials for {symbol}: {e}")
         return {"income": [], "balance": [], "cash_flow": []}
+
+def get_company_info(symbol: str):
+    """
+    Fetches the full .info dictionary from yfinance, which is a treasure trove of data
+    including the crucial sector, industry, and country information.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        if not info or 'symbol' not in info:
+            print(f"Warning: No yfinance .info object found for {symbol}")
+            return {}
+        return info
+    except Exception as e:
+        print(f"Error fetching yfinance company info for {symbol}: {e}")
+        return {}
