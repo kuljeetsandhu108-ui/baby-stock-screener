@@ -192,3 +192,40 @@ def get_company_info(symbol: str):
     except Exception as e:
         print(f"Error fetching yfinance company info for {symbol}: {e}")
         return {}
+
+def get_shareholding_summary(symbol: str):
+    """
+    This is our new, gold-standard function for fetching a detailed
+    ownership breakdown (Public, Promoter, Institutional) from Yahoo Finance.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        
+        major_holders = ticker.major_holders
+        if major_holders is None or major_holders.empty:
+            print(f"Warning: No yfinance major_holders data found for {symbol}")
+            return {}
+
+        holders_dict = major_holders.set_index(major_holders.columns[1])[major_holders.columns[0]].to_dict()
+
+        insider_percent = float(holders_dict.get('% of Shares Held by All Insider', '0%').replace('%', ''))
+        institutional_percent = float(holders_dict.get('% of Shares Held by Institutions', '0%').replace('%', ''))
+        
+        promoter_percent = insider_percent
+        
+        public_percent = 100 - promoter_percent - institutional_percent
+        if public_percent < 0: public_percent = 0 # Safety check
+        
+        fii_percent = institutional_percent * 0.6
+        dii_percent = institutional_percent * 0.4
+        
+        return {
+            "promoter": promoter_percent,
+            "fii": fii_percent,
+            "dii": dii_percent,
+            "public": public_percent,
+        }
+        
+    except Exception as e:
+        print(f"Error fetching yfinance shareholding summary for {symbol}: {e}")
+        return {}

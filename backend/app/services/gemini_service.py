@@ -171,3 +171,55 @@ def find_peer_tickers_by_industry(company_name: str, sector: str, industry: str,
     except Exception as e:
         print(f"An error occurred while finding peer tickers with AI: {e}")
         return []
+
+def generate_fundamental_conclusion(
+    company_name: str,
+    piotroski_data: dict,
+    graham_data: dict,
+    darvas_data: dict,
+    canslim_assessment: str,
+    philosophy_assessment: str
+):
+    """
+    Performs a meta-analysis of all other fundamental scans to generate a final conclusion.
+    """
+    try:
+        configure_gemini_for_request()
+        model = genai.GenerativeModel('gemini-2.5-flash')
+
+        # We format all the input data from our different scanners into a clean summary for the AI.
+        data_summary = f"""
+        - Piotroski F-Score: {piotroski_data.get('score', 'N/A')} out of 9.
+        - Benjamin Graham Scan: Passed {graham_data.get('score', 'N/A')} out of 7 tenets.
+        - Darvas Box Status: {darvas_data.get('status', 'N/A')}.
+        - CANSLIM Assessment Results:
+        {canslim_assessment}
+        - Value Investing (Buffett, etc.) Assessment Results:
+        {philosophy_assessment}
+        """
+
+        # This is our ultimate, high-end prompt that instructs the AI to act as a senior analyst.
+        prompt = f"""
+        Act as a senior portfolio manager providing a final "bottom line" conclusion on {company_name} for a client.
+        You have been provided with the results of several quantitative and qualitative screening models.
+        Your task is to synthesize these results into a clear, actionable summary.
+
+        **Provided Data:**
+        {data_summary}
+
+        **Your Output MUST follow this format exactly:**
+
+        GRADE: [Provide a single letter grade from A+ to F based on the overall strength of the data]
+        THESIS: [Provide a single, powerful sentence summarizing the core investment thesis. e.g., "A financially strong, high-growth company that appears to be trading at a fair price."]
+        TAKEAWAYS:
+        - [Provide the first key positive or negative takeaway as a bullet point.]
+        - [Provide the second key positive or negative takeaway as a bullet point.]
+        - [Provide a third, conclusive takeaway that summarizes the overall picture.]
+        """
+
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"An error occurred while generating fundamental conclusion: {e}")
+        # Provide a structured error message that our frontend can still parse gracefully.
+        return "GRADE: N/A\nTHESIS: The AI analysis could not be completed at this time.\nTAKEAWAYS:\n- An error occurred while communicating with the AI engine."

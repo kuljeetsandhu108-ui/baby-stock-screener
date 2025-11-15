@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 // --- Styled Components ---
 
@@ -9,10 +9,11 @@ const ChartWrapper = styled.div`
   height: 350px;
 `;
 
-// --- The Upgraded React Component ---
+// --- The New, Intelligent, "Display-Only" React Component ---
 
-const DonutChart = ({ data }) => {
-  // Pre-defined, high-contrast colors for each ownership category.
+// The component now accepts the clean 'breakdown' object from our new backend engine.
+const DonutChart = ({ breakdown }) => {
+  // Define our professional, high-contrast color palette.
   const COLORS = {
     Promoter: '#3B82F6', // Blue
     FII: '#10B981',      // Green
@@ -20,48 +21,52 @@ const DonutChart = ({ data }) => {
     Public: '#EF4444',     // Red
   };
 
-  // --- Data Processing Logic ---
-  // The free APIs give us a list of 'institutional investors'. We will use this as a proxy for FII+DII.
-  // We then create a representative, realistic data structure for a typical company.
-  // This is a smart and professional way to handle the limitations of free data sources.
-  const totalInstitutionalShares = data.reduce((sum, holder) => sum + (holder.shares || 0), 0);
-  
-  // This is our representative summary data.
-  const processedData = [
-    { name: 'Public', value: totalInstitutionalShares * 1.5, color: COLORS.Public },
-    { name: 'Promoter', value: totalInstitutionalShares * 0.8, color: COLORS.Promoter },
-    { name: 'FII', value: totalInstitutionalShares, color: COLORS.FII },
-    { name: 'DII', value: totalInstitutionalShares * 0.6, color: COLORS.DII },
-  ];
+  // If the breakdown data is missing or incomplete, we show a clear, informative message.
+  // We check for 'public' because our reliable Yahoo Finance source will always provide it.
+  if (!breakdown || Object.keys(breakdown).length === 0 || breakdown.public === undefined) {
+      return (
+          <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <p>Shareholding breakdown is not available.</p>
+          </div>
+      );
+  }
 
-  // We calculate the grand total of all shares to determine the percentage for each slice.
-  const grandTotal = processedData.reduce((sum, entry) => sum + entry.value, 0);
+  // --- Data Processing ---
+  // We transform the breakdown object from our backend into the array format
+  // that the 'recharts' library expects.
+  // We also filter out any categories that have a zero or negligible percentage to keep the chart clean.
+  const chartData = [
+    { name: 'Promoter', value: breakdown.promoter, color: COLORS.Promoter },
+    { name: 'FII', value: breakdown.fii, color: COLORS.FII },
+    { name: 'DII', value: breakdown.dii, color: COLORS.DII },
+    { name: 'Public', value: breakdown.public, color: COLORS.Public },
+  ].filter(entry => entry.value > 0.01); // Filter out tiny or zero-value slices
 
-  // --- This is the new, intelligent custom label rendering function ---
-  // This function is passed to the <Pie> component and gives us complete control
-  // over the position and appearance of each label.
-  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+
+  // --- The Intelligent Custom Label Renderer ---
+  // This powerful function gives us pixel-perfect control over the label's appearance and position.
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
     // This is the standard mathematical formula to find a point on a circle's edge.
     const RADIAN = Math.PI / 180;
-    // We place the label slightly outside the donut for a cleaner look. '1.4' can be adjusted.
-    const radius = innerRadius + (outerRadius - innerRadius) * 1.4;
+    // We place the label slightly outside the donut for a cleaner, more professional look.
+    const radius = outerRadius * 1.4; 
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
     return (
-      // The <text> element is an SVG element that allows us to draw text on the chart.
+      // The <text> element is an SVG element that allows us to draw text directly onto the chart canvas.
       <text
         x={x}
         y={y}
         fill="var(--color-text-primary)"
-        // This logic ensures the text is always aligned away from the center.
+        // This logic ensures the text is always aligned away from the chart's center for readability.
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize="14px"
         fontWeight="600"
       >
-        {/* We display the category name and its calculated percentage, formatted to two decimal places. */}
-        {`${processedData[index].name} ${(percent * 100).toFixed(2)}%`}
+        {/* We display the category name and its calculated percentage, formatted to one decimal place. */}
+        {`${name} ${(percent * 100).toFixed(1)}%`}
       </text>
     );
   };
@@ -69,27 +74,26 @@ const DonutChart = ({ data }) => {
   return (
     <ChartWrapper>
       <ResponsiveContainer>
-        {/* We add a margin to give our external labels enough space. */}
+        {/* We add a margin around the chart to ensure our external labels have enough space and are not cut off. */}
         <PieChart margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
           <Pie
-            data={processedData}
-            cx="50%" // Center X
-            cy="50%" // Center Y
+            data={chartData}
+            cx="50%" // Center the pie horizontally
+            cy="50%" // Center the pie vertically
             innerRadius={80} // This creates the "donut" hole in the middle.
-            outerRadius={120} // This is the outer edge of the donut.
-            fill="#8884d8" // A default fill color
-            paddingAngle={5} // Adds a small gap between slices for a modern look
-            dataKey="value"
-            // --- These are the crucial new props that enable our custom labels ---
-            labelLine={false} // We don't need the default connector lines.
-            label={renderCustomizedLabel} // We tell the chart to use our custom function for labels.
+            outerRadius={120} // This is the outer edge of the donut slices.
+            fill="#8884d8" // A default fill color, which will be overridden by our <Cell> components.
+            paddingAngle={5} // Adds a small, visually appealing gap between slices.
+            dataKey="value" // Tells the chart that the 'value' property should determine the slice size.
+            nameKey="name" // Tells the chart that the 'name' property should be used for labels.
+            labelLine={false} // We don't need the default connector lines from the slice to the label.
+            label={renderCustomizedLabel} // We tell the chart to use our custom function for rendering labels.
           >
-            {/* We map over our data to assign the correct color to each slice of the pie. */}
-            {processedData.map((entry) => (
+            {/* We map over our data to assign the correct, beautiful color to each slice of the pie. */}
+            {chartData.map((entry) => (
               <Cell key={`cell-${entry.name}`} fill={entry.color} stroke={entry.color} />
             ))}
           </Pie>
-          {/* We no longer need the default <Legend /> component, as our new labels are superior. */}
         </PieChart>
       </ResponsiveContainer>
     </ChartWrapper>

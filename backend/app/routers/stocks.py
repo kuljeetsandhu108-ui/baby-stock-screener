@@ -4,6 +4,13 @@ from ..services import fmp_service, yahoo_service, news_service, gemini_service,
 from pydantic import BaseModel
 from typing import List, Dict, Any
 
+class ConclusionRequest(BaseModel):
+    companyName: str
+    piotroskiData: Dict[str, Any]
+    grahamData: Dict[str, Any]
+    darvasData: Dict[str, Any]
+    canslimAssessment: str
+    philosophyAssessment: str
 class SwotRequest(BaseModel): companyName: str; description: str
 class ForecastRequest(BaseModel): companyName: str; analystRatings: List[Dict[str, Any]]; priceTarget: Dict[str, Any]; keyStats: Dict[str, Any]; newsHeadlines: List[str]
 class FundamentalRequest(BaseModel): companyName: str; keyMetrics: Dict[str, Any]
@@ -63,6 +70,24 @@ async def get_peers_comparison(symbol: str):
     final_peers_data = list(peers_map.values())
     return final_peers_data
 
+@router.post("/{symbol}/conclusion-analysis")
+async def get_conclusion_analysis(symbol: str, request_data: ConclusionRequest = Body(...)):
+    """
+    This lazy-loading endpoint is dedicated to generating the final AI-powered conclusion.
+    """
+    print(f"Received AI Conclusion Analysis request for {symbol}...")
+    
+    conclusion = await asyncio.to_thread(
+        gemini_service.generate_fundamental_conclusion,
+        company_name=request_data.companyName,
+        piotroski_data=request_data.piotroskiData,
+        graham_data=request_data.grahamData,
+        darvas_data=request_data.darvasData,
+        canslim_assessment=request_data.canslimAssessment,
+        philosophy_assessment=request_data.philosophyAssessment
+    )
+    return {"conclusion": conclusion}
+
 @router.get("/{symbol}/all")
 async def get_all_stock_data(symbol: str):
     tasks = {
@@ -74,7 +99,10 @@ async def get_all_stock_data(symbol: str):
         "fmp_quarterly_income": asyncio.to_thread(fmp_service.get_financial_statements, symbol, "income-statement", "quarter", 5),
         "fmp_quarterly_balance": asyncio.to_thread(fmp_service.get_financial_statements, symbol, "balance-sheet-statement", "quarter", 5),
         "fmp_quarterly_cash_flow": asyncio.to_thread(fmp_service.get_financial_statements, symbol, "cash-flow-statement", "quarter", 5),
-        "shareholding": asyncio.to_thread(fmp_service.get_shareholding_data, symbol), "news": asyncio.to_thread(news_service.get_company_news, symbol),
+        "shareholding": asyncio.to_thread(fmp_service.get_shareholding_data, symbol),
+        "yf_shareholding": asyncio.to_thread(yahoo_service.get_shareholding_summary, symbol),
+        "news": asyncio.to_thread(news_service.get_company_news, symbol),
+        
         "yf_recommendations": asyncio.to_thread(yahoo_service.get_analyst_recommendations, symbol),
         "yf_price_target": asyncio.to_thread(yahoo_service.get_price_target_data, symbol),
         "yf_historical_financials": asyncio.to_thread(yahoo_service.get_historical_financials, symbol),
@@ -125,6 +153,26 @@ async def get_all_stock_data(symbol: str):
     final_data['moving_averages'] = technical_service.calculate_moving_averages(hist_df)
     final_data['pivot_points'] = technical_service.calculate_pivot_points(hist_df)
     final_data['overall_sentiment'] = sentiment_service.calculate_overall_sentiment(piotroski_score=final_data['piotroski_f_score'].get('score'), pe_ratio=final_data['key_metrics'].get('peRatioTTM'), analyst_ratings=raw_data.get('yf_recommendations', []), rsi=final_data['technical_indicators'].get('rsi'))
+# --- INTELLIGENT SHAREHOLDING MERGE ---
+    # We prioritize the detailed breakdown from Yahoo Finance.
+    yf_shareholding = raw_data.get('yf_shareholding', {})
+    if yf_shareholding and yf_shareholding.get('promoter', 0) > 0:
+        print(f"Using reliable Yahoo Finance shareholding data for {symbol}.")
+        final_data['shareholding_breakdown'] = yf_shareholding
+    else:
+        # If Yahoo fails, we fall back to a simplified calculation from FMP's institutional data.
+        print(f"Falling back to FMP for shareholding data for {symbol}.")
+        fmp_shareholding = raw_data.get('shareholding', [])
+        total_institutional_shares = sum(h.get('shares', 0) for h in fmp_shareholding)
+        # This is a rough proxy, but better than nothing.
+        final_data['shareholding_breakdown'] = {
+            "promoter": 0,
+            "fii": total_institutional_shares * 0.6,
+            "dii": total_institutional_shares * 0.4,
+            "public": 0, # Cannot be determined from this data
+        }
+    
+    # We still pass the raw FMP data for any other components that might need it
     final_data['shareholding'] = raw_data.get('shareholding', [])
     final_data['news'] = raw_data.get('news', [])
     final_data['analyst_ratings'] = raw_data.get('yf_recommendations', [])

@@ -35,7 +35,7 @@ const SectionTitle = styled.h3`
 // --- The Upgraded React Component ---
 
 // It now accepts 'historicalStatements' instead of 'historicalOwnership'
-const Shareholding = ({ shareholdingData, historicalStatements }) => {
+const Shareholding = ({ shareholdingData, historicalStatements, shareholdingBreakdown }) => {
 
   // Defensive check: If there's no current shareholding data, show a message.
   if (!shareholdingData || !Array.isArray(shareholdingData) || shareholdingData.length === 0) {
@@ -52,7 +52,8 @@ const Shareholding = ({ shareholdingData, historicalStatements }) => {
       <GridContainer>
         <ChartContainer>
           <SectionTitle>Summary</SectionTitle>
-          <DonutChart data={shareholdingData} />
+          <DonutChart breakdown={shareholdingBreakdown} />
+
         </ChartContainer>
         <ChartContainer>
            <TrendChart />

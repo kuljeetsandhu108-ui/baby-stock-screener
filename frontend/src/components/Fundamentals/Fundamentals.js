@@ -5,6 +5,7 @@ import axios from 'axios';
 import { NestedTabs, NestedTabPanel } from '../common/Tabs/NestedTabs';
 import DarvasScan from './DarvasScan';
 import BenjaminGrahamScan from './BenjaminGrahamScan';
+import FundamentalConclusion from './FundamentalConclusion';
 
 // --- Styled Components & Animations ---
 
@@ -126,7 +127,7 @@ const Loader = styled.div`
   justify-content: center;
 `;
 
-// --- The Upgraded Master Fundamentals Component ---
+// --- The Final Master Fundamentals Component ---
 
 const Fundamentals = ({
   symbol,
@@ -135,48 +136,18 @@ const Fundamentals = ({
   keyMetrics,
   piotroskiData,
   darvasScanData,
-  grahamScanData, // <-- NEW
+  grahamScanData,
   quarterlyEarnings,
   annualEarnings,
   shareholding,
   delay,
+  philosophyAssessment,
+  canslimAssessment,
+  isLoadingPhilosophy,
+  isLoadingCanslim
 }) => {
-  const [philosophyAssessment, setPhilosophyAssessment] = useState('');
-  const [canslimAssessment, setCanslimAssessment] = useState('');
-  const [isLoadingPhilosophy, setIsLoadingPhilosophy] = useState(true);
-  const [isLoadingCanslim, setIsLoadingCanslim] = useState(true);
 
-  useEffect(() => {
-    const fetchPhilosophyAssessment = async () => {
-      if (!symbol || !profile || !keyMetrics) { setIsLoadingPhilosophy(false); return; }
-      setIsLoadingPhilosophy(true);
-      try {
-        const payload = { companyName: profile.companyName, keyMetrics: keyMetrics };
-        const response = await axios.post(`/api/stocks/${symbol}/fundamental-analysis`, payload);
-        setPhilosophyAssessment(response.data.assessment);
-      } catch (error) { setPhilosophyAssessment("Could not generate AI assessment."); } finally { setIsLoadingPhilosophy(false); }
-    };
-    const timer = setTimeout(fetchPhilosophyAssessment, delay || 0);
-    return () => clearTimeout(timer);
-  }, [symbol, profile, keyMetrics, delay]);
-
-  useEffect(() => {
-    const fetchCanslimAssessment = async () => {
-      if (!symbol || !profile || !quote || !quarterlyEarnings || !annualEarnings || !shareholding) { setIsLoadingCanslim(false); return; }
-      setIsLoadingCanslim(true);
-      try {
-        const payload = {
-          companyName: profile.companyName, quote: quote, quarterlyEarnings: quarterlyEarnings,
-          annualEarnings: annualEarnings, institutionalHolders: shareholding.length,
-        };
-        const response = await axios.post(`/api/stocks/${symbol}/canslim-analysis`, payload);
-        setCanslimAssessment(response.data.assessment);
-      } catch (error) { setCanslimAssessment("Could not generate CANSLIM assessment."); } finally { setIsLoadingCanslim(false); }
-    };
-    const timer = setTimeout(fetchCanslimAssessment, (delay || 0) + 200);
-    return () => clearTimeout(timer);
-  }, [symbol, profile, quote, quarterlyEarnings, annualEarnings, shareholding, delay]);
-
+  // --- Data Processing for Piotroski Score ---
   const { score, criteria } = piotroskiData || {};
   const getScoreColor = () => {
     if (score >= 7) return 'var(--color-success)';
@@ -185,6 +156,7 @@ const Fundamentals = ({
   };
   const scoreColor = getScoreColor();
   
+  // --- Parsers for AI Markdown Tables ---
   const parsedPhilosophy = useMemo(() => {
     if (!philosophyAssessment || typeof philosophyAssessment !== 'string') return [];
     return philosophyAssessment.split('\n').map(r => r.split('|').map(c => c.trim())).filter(r => r.length > 2 && !r[1].includes('---'));
@@ -198,6 +170,21 @@ const Fundamentals = ({
   return (
     <Card>
       <NestedTabs>
+        
+        <NestedTabPanel label="Conclusion">
+          <SectionContainer>
+            <FundamentalConclusion
+              symbol={symbol}
+              companyName={profile?.companyName}
+              piotroskiData={piotroskiData}
+              grahamData={grahamScanData}
+              darvasData={darvasScanData}
+              canslimAssessment={canslimAssessment}
+              philosophyAssessment={philosophyAssessment}
+            />
+          </SectionContainer>
+        </NestedTabPanel>
+
         <NestedTabPanel label="Graham Scan">
           <SectionContainer>
             <BenjaminGrahamScan scanData={grahamScanData} />
@@ -277,6 +264,7 @@ const Fundamentals = ({
                 )}
             </SectionContainer>
         </NestedTabPanel>
+        
       </NestedTabs>
     </Card>
   );

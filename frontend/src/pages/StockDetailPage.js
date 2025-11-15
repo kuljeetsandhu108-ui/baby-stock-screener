@@ -104,6 +104,9 @@ const StockDetailPage = () => {
   const [canslimAssessment, setCanslimAssessment] = useState('');
   const [isLoadingPhilosophy, setIsLoadingPhilosophy] = useState(true);
   const [isLoadingCanslim, setIsLoadingCanslim] = useState(true);
+  // --- Add these lines with the other state variables ---
+  const [conclusion, setConclusion] = useState('');
+  const [isLoadingConclusion, setIsLoadingConclusion] = useState(true);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -138,6 +141,32 @@ const StockDetailPage = () => {
       } catch (error) { setSwotAnalysis("Could not generate SWOT analysis."); } finally { setIsLoadingSwot(false); }
     };
 
+    // --- Add this entire function inside the main useEffect ---
+    const fetchConclusionAnalysis = async () => {
+      if (!stockData || !stockData.piotroski_f_score || !stockData.graham_scan || !stockData.darvas_scan || !canslimAssessment || !philosophyAssessment) {
+        setIsLoadingConclusion(false);
+        return;
+      }
+      setIsLoadingConclusion(true);
+      try {
+        const payload = {
+          companyName: stockData.profile.companyName,
+          piotroskiData: stockData.piotroski_f_score,
+          grahamData: stockData.graham_scan,
+          darvasData: stockData.darvas_scan,
+          canslimAssessment: canslimAssessment,
+          philosophyAssessment: philosophyAssessment,
+        };
+        const response = await axios.post(`/api/stocks/${symbol}/conclusion-analysis`, payload);
+        setConclusion(response.data.conclusion);
+      } catch (error) {
+        console.error("Failed to fetch AI conclusion:", error);
+        setConclusion("GRADE: N/A\nTHESIS: Could not generate AI conclusion.\nTAKEAWAYS:\n- Error communicating with the analysis engine.");
+      } finally {
+        setIsLoadingConclusion(false);
+      }
+    };
+
     const fetchPhilosophyAssessment = async () => {
       if (!stockData.profile || !stockData.key_metrics) { setIsLoadingPhilosophy(false); return; }
       setIsLoadingPhilosophy(true);
@@ -164,11 +193,15 @@ const StockDetailPage = () => {
     const swotTimer = setTimeout(fetchSwotAnalysis, 100);
     const philosophyTimer = setTimeout(fetchPhilosophyAssessment, 300);
     const canslimTimer = setTimeout(fetchCanslimAssessment, 500);
+    const conclusionTimer = setTimeout(fetchConclusionAnalysis, 800); // Runs last
+
 
     return () => {
       clearTimeout(swotTimer);
       clearTimeout(philosophyTimer);
       clearTimeout(canslimTimer);
+      clearTimeout(conclusionTimer);
+
     };
   }, [stockData, symbol]);
 
@@ -238,6 +271,9 @@ const StockDetailPage = () => {
                 canslimAssessment={canslimAssessment}
                 isLoadingPhilosophy={isLoadingPhilosophy}
                 isLoadingCanslim={isLoadingCanslim}
+                conclusion={conclusion} // <-- ADD THIS LINE
+    isLoadingConclusion={isLoadingConclusion} // <-- ADD THIS LINE
+
             />
         </TabPanel>
 
@@ -275,6 +311,7 @@ const StockDetailPage = () => {
             <Shareholding 
                 shareholdingData={stockData.shareholding}
                 historicalStatements={stockData.annual_revenue_and_profit}
+                shareholdingBreakdown={stockData.shareholding_breakdown}
             />
         </TabPanel>
         
