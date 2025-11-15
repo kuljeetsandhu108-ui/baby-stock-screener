@@ -4,12 +4,13 @@ import styled from 'styled-components';
 // --- Styled Components ---
 
 const ScanContainer = styled.div`
-  /* Main container styling */
+  /* Main container for the Darvas Scan section */
 `;
 
 const StatusValue = styled.span`
   font-size: 2rem;
   font-weight: 700;
+  /* Dynamically sets the color based on the scan result */
   color: ${({ result }) => {
     if (result === 'Pass') return 'var(--color-success)';
     if (result === 'Fail') return 'var(--color-danger)';
@@ -51,35 +52,57 @@ const BoxValue = styled.div`
   color: var(--color-text-primary);
 `;
 
-// --- The React Component ---
+// --- Intelligent Currency Helper Function ---
+const getCurrencySymbol = (currencyCode) => {
+    switch (currencyCode) {
+        case 'INR':
+            return '₹';
+        case 'USD':
+            return '$';
+        case 'JPY':
+            return '¥';
+        // Add more currencies as needed
+        default:
+            return '$'; // Default to dollar if currency is unknown
+    }
+};
 
-const DarvasScan = ({ scanData }) => {
-  // If we don't have the data from the backend, show an informative message.
+// --- The Final, Corrected React Component ---
+
+// It now accepts the 'currency' prop from its parent, Fundamentals.js
+const DarvasScan = ({ scanData, currency }) => {
+
+  // If the data from the backend is missing, show an informative message.
   if (!scanData || !scanData.status) {
     return (
       <ScanContainer>
-        <p>Darvas Scan data is not available.</p>
+        <p>Darvas Scan data is not available for this stock.</p>
       </ScanContainer>
     );
   }
 
   const { status, message, box_top, box_bottom, result } = scanData;
+  
+  // Get the correct currency symbol to display.
+  const currencySymbol = getCurrencySymbol(currency);
 
   return (
     <ScanContainer>
       <StatusValue result={result}>{status}</StatusValue>
       <MessageText>{message}</MessageText>
 
-      {/* Only show the Box Top/Bottom info if a valid box has been identified */}
+      {/* Only show the Box Top/Bottom info if a valid box has been identified by the backend. */}
       {box_top && box_bottom && (
         <BoxInfoGrid>
           <BoxInfoItem>
             <BoxLabel>Box Top (Resistance)</BoxLabel>
-            <BoxValue>${box_top.toFixed(2)}</BoxValue>
+            {/* --- UPDATED: Use the dynamic currency symbol --- */}
+            <BoxValue>{currencySymbol}{box_top.toFixed(2)}</BoxValue>
           </BoxInfoItem>
           <BoxInfoItem>
             <BoxLabel>Box Bottom (Support)</BoxLabel>
-            <BoxValue>${box_bottom.toFixed(2)}</BoxValue>
+            {/* --- UPDATED: Use the dynamic currency symbol --- */}
+            <BoxValue>{currencySymbol}{box_bottom.toFixed(2)}</BoxValue>
           </BoxInfoItem>
         </BoxInfoGrid>
       )}

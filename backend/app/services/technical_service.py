@@ -1,8 +1,24 @@
 import pandas as pd
 
-def calculate_darvas_box(hist_df: pd.DataFrame, quote: dict):
+def get_currency_symbol(currency_code: str):
+    """
+    Converts a currency code (e.g., 'INR') into its corresponding symbol (e.g., '₹').
+    This is a centralized helper function to ensure consistency.
+    """
+    symbols = {
+        "INR": "₹",
+        "USD": "$",
+        "JPY": "¥",
+        "EUR": "€",
+        "GBP": "£",
+    }
+    # If the currency code is not in our map, we default to a dollar sign.
+    return symbols.get(currency_code, "$")
+
+def calculate_darvas_box(hist_df: pd.DataFrame, quote: dict, currency_code: str):
     """
     Analyzes historical price data to identify a Darvas Box pattern.
+    This function is now "currency-aware" and will use the correct symbol in its messages.
     """
     # We need at least 30 days of data and the latest quote to perform the scan.
     if hist_df is None or len(hist_df) < 30 or not quote:
@@ -17,12 +33,15 @@ def calculate_darvas_box(hist_df: pd.DataFrame, quote: dict):
         # If any of the core data points are missing, we cannot proceed.
         if not all([current_price, year_high, avg_volume, current_volume]):
              return {"status": "Insufficient Data", "message": "Missing key price or volume data."}
+        
+        # Get the correct currency symbol for formatting our messages.
+        currency_symbol = get_currency_symbol(currency_code)
 
         # Core Darvas Criteria: Stock must be trading near its 52-Week High.
         if current_price < (year_high * 0.90):
             return {
                 "status": "Not a Candidate",
-                "message": f"Stock price (${current_price:.2f}) is not within 10% of its 52-week high (${year_high:.2f})."
+                "message": f"Stock price ({currency_symbol}{current_price:.2f}) is not within 10% of its 52-week high ({currency_symbol}{year_high:.2f})."
             }
 
         # Identify the "Box" by looking at the price range of the last 15 trading days.
@@ -42,21 +61,21 @@ def calculate_darvas_box(hist_df: pd.DataFrame, quote: dict):
             volume_check = "on high volume" if current_volume > (avg_volume * 1.5) else "on average volume"
             return {
                 "status": "Breakout!",
-                "message": f"Stock has broken out above the box top of ${box_top:.2f} {volume_check}.",
+                "message": f"Stock has broken out above the box top of {currency_symbol}{box_top:.2f} {volume_check}.",
                 "box_top": box_top, "box_bottom": box_bottom, "result": "Pass"
             }
         
         elif current_price < box_bottom:
             return {
                 "status": "Breakdown",
-                "message": f"Stock has broken down below the box bottom of ${box_bottom:.2f}.",
+                "message": f"Stock has broken down below the box bottom of {currency_symbol}{box_bottom:.2f}.",
                 "box_top": box_top, "box_bottom": box_bottom, "result": "Fail"
             }
         
         else:
             return {
                 "status": "In Box",
-                "message": f"Stock is consolidating in a Darvas Box between ${box_bottom:.2f} and ${box_top:.2f}.",
+                "message": f"Stock is consolidating in a Darvas Box between {currency_symbol}{box_bottom:.2f} and {currency_symbol}{box_top:.2f}.",
                 "box_top": box_top, "box_bottom": box_bottom, "result": "Neutral"
             }
 
@@ -73,8 +92,6 @@ def calculate_moving_averages(hist_df: pd.DataFrame):
         return {} # Not enough data for a full calculation
     
     try:
-        # Use pandas' powerful rolling mean function on the 'close' price column.
-        # .iloc[-1] gets the most recent value for each calculation.
         return {
             "5": hist_df['close'].rolling(window=5).mean().iloc[-1],
             "10": hist_df['close'].rolling(window=10).mean().iloc[-1],
@@ -93,50 +110,34 @@ def calculate_pivot_points(hist_df: pd.DataFrame):
     previous trading day's High, Low, and Close prices.
     """
     if hist_df is None or len(hist_df) < 2:
-        return {} # We need at least 2 days of data (today and previous day)
+        return {} # We need at least 2 days of data
         
     try:
-        # Get the previous trading day's data (second to last row).
         prev_day = hist_df.iloc[-2]
-        high = prev_day['high']
-        low = prev_day['low']
-        close = prev_day['close']
+        high, low, close = prev_day['high'], prev_day['low'], prev_day['close']
         price_range = high - low
 
-        # --- Classic Calculations ---
+        # Classic Calculations
         pivot_classic = (high + low + close) / 3
         classic = {
-            "pp": pivot_classic,
-            "r1": (2 * pivot_classic) - low,
-            "s1": (2 * pivot_classic) - high,
-            "r2": pivot_classic + price_range,
-            "s2": pivot_classic - price_range,
-            "r3": high + 2 * (pivot_classic - low),
-            "s3": low - 2 * (high - pivot_classic)
+            "pp": pivot_classic, "r1": (2 * pivot_classic) - low, "s1": (2 * pivot_classic) - high,
+            "r2": pivot_classic + price_range, "s2": pivot_classic - price_range,
+            "r3": high + 2 * (pivot_classic - low), "s3": low - 2 * (high - pivot_classic)
         }
 
-        # --- Fibonacci Calculations ---
-        # The pivot is the same as classic
+        # Fibonacci Calculations
         fibonacci = {
-            "pp": pivot_classic,
-            "r1": pivot_classic + (0.382 * price_range),
-            "s1": pivot_classic - (0.382 * price_range),
-            "r2": pivot_classic + (0.618 * price_range),
-            "s2": pivot_classic - (0.618 * price_range),
-            "r3": pivot_classic + (1.000 * price_range),
-            "s3": pivot_classic - (1.000 * price_range)
+            "pp": pivot_classic, "r1": pivot_classic + (0.382 * price_range), "s1": pivot_classic - (0.382 * price_range),
+            "r2": pivot_classic + (0.618 * price_range), "s2": pivot_classic - (0.618 * price_range),
+            "r3": pivot_classic + (1.000 * price_range), "s3": pivot_classic - (1.000 * price_range)
         }
 
-        # --- Camarilla Calculations ---
-        # The pivot is the same as classic
+        # Camarilla Calculations
         camarilla = {
             "pp": pivot_classic,
-            "r1": close + (price_range * 1.1 / 12),
-            "s1": close - (price_range * 1.1 / 12),
-            "r2": close + (price_range * 1.1 / 6),
-            "s2": close - (price_range * 1.1 / 6),
-            "r3": close + (price_range * 1.1 / 4),
-            "s3": close - (price_range * 1.1 / 4)
+            "r1": close + (price_range * 1.1 / 12), "s1": close - (price_range * 1.1 / 12),
+            "r2": close + (price_range * 1.1 / 6), "s2": close - (price_range * 1.1 / 6),
+            "r3": close + (price_range * 1.1 / 4), "s3": close - (price_range * 1.1 / 4)
         }
 
         return {

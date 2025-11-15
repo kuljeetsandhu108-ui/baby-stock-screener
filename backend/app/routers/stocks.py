@@ -120,7 +120,8 @@ async def get_all_stock_data(symbol: str):
     final_data['graham_scan'] = fundamental_service.calculate_graham_scan(final_data['profile'], final_data['key_metrics'], income_statements)
     hist_df = await asyncio.to_thread(yahoo_service.get_historical_data, symbol, "300d")
     final_data['technical_indicators'] = await asyncio.to_thread(yahoo_service.calculate_technical_indicators, hist_df)
-    final_data['darvas_scan'] = technical_service.calculate_darvas_box(hist_df, final_data['quote'])
+    final_data['darvas_scan'] = technical_service.calculate_darvas_box(hist_df, final_data['quote'], final_data['profile'].get('currency'))
+
     final_data['moving_averages'] = technical_service.calculate_moving_averages(hist_df)
     final_data['pivot_points'] = technical_service.calculate_pivot_points(hist_df)
     final_data['overall_sentiment'] = sentiment_service.calculate_overall_sentiment(piotroski_score=final_data['piotroski_f_score'].get('score'), pe_ratio=final_data['key_metrics'].get('peRatioTTM'), analyst_ratings=raw_data.get('yf_recommendations', []), rsi=final_data['technical_indicators'].get('rsi'))

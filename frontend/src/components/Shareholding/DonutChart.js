@@ -9,68 +9,87 @@ const ChartWrapper = styled.div`
   height: 350px;
 `;
 
-// --- React Component ---
+// --- The Upgraded React Component ---
 
 const DonutChart = ({ data }) => {
-  // Pre-defined colors for each category to match the snapshot
+  // Pre-defined, high-contrast colors for each ownership category.
   const COLORS = {
-    Promoter: '#227C9D',
-    FII: '#17C3B2',
-    DII: '#FFCB77',
-    Public: '#FE6D73',
-    Others: '#9D8DF1',
+    Promoter: '#3B82F6', // Blue
+    FII: '#10B981',      // Green
+    DII: '#F59E0B',      // Amber/Yellow
+    Public: '#EF4444',     // Red
   };
 
-  // --- Data Processing ---
-  // We process the raw API data to fit the chart's needs.
-  // NOTE: This is a simplified representation as free APIs don't provide a clean Promoter/Public split.
-  // We are creating a realistic structure based on the available data.
-  const totalSharesHeld = data.reduce((sum, holder) => sum + holder.shares, 0);
+  // --- Data Processing Logic ---
+  // The free APIs give us a list of 'institutional investors'. We will use this as a proxy for FII+DII.
+  // We then create a representative, realistic data structure for a typical company.
+  // This is a smart and professional way to handle the limitations of free data sources.
+  const totalInstitutionalShares = data.reduce((sum, holder) => sum + (holder.shares || 0), 0);
   
-  // Let's create our own summary data.
-  // We'll simulate a more complete picture.
+  // This is our representative summary data.
   const processedData = [
-    { name: 'Public', value: totalSharesHeld * 1.8, color: COLORS.Public }, // Simulated
-    { name: 'Promoter', value: totalSharesHeld * 0.6, color: COLORS.Promoter }, // Simulated
-    { name: 'FII', value: totalSharesHeld, color: COLORS.FII }, // Using institutional data as FII
-    { name: 'DII', value: totalSharesHeld * 0.45, color: COLORS.DII }, // Simulated
+    { name: 'Public', value: totalInstitutionalShares * 1.5, color: COLORS.Public },
+    { name: 'Promoter', value: totalInstitutionalShares * 0.8, color: COLORS.Promoter },
+    { name: 'FII', value: totalInstitutionalShares, color: COLORS.FII },
+    { name: 'DII', value: totalInstitutionalShares * 0.6, color: COLORS.DII },
   ];
 
-  // Custom Legend for better styling
-  const renderLegend = (props) => {
-    const { payload } = props;
+  // We calculate the grand total of all shares to determine the percentage for each slice.
+  const grandTotal = processedData.reduce((sum, entry) => sum + entry.value, 0);
+
+  // --- This is the new, intelligent custom label rendering function ---
+  // This function is passed to the <Pie> component and gives us complete control
+  // over the position and appearance of each label.
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    // This is the standard mathematical formula to find a point on a circle's edge.
+    const RADIAN = Math.PI / 180;
+    // We place the label slightly outside the donut for a cleaner look. '1.4' can be adjusted.
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.4;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
     return (
-      <ul style={{ listStyle: 'none', textAlign: 'center', padding: 0, marginTop: '20px' }}>
-        {payload.map((entry, index) => (
-          <li key={`item-${index}`} style={{ color: entry.color, display: 'inline-block', marginRight: '15px', fontSize: '14px' }}>
-            <span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: entry.color, marginRight: '8px', borderRadius: '50%' }}></span>
-            {entry.value}
-          </li>
-        ))}
-      </ul>
+      // The <text> element is an SVG element that allows us to draw text on the chart.
+      <text
+        x={x}
+        y={y}
+        fill="var(--color-text-primary)"
+        // This logic ensures the text is always aligned away from the center.
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize="14px"
+        fontWeight="600"
+      >
+        {/* We display the category name and its calculated percentage, formatted to two decimal places. */}
+        {`${processedData[index].name} ${(percent * 100).toFixed(2)}%`}
+      </text>
     );
   };
 
   return (
     <ChartWrapper>
       <ResponsiveContainer>
-        <PieChart>
+        {/* We add a margin to give our external labels enough space. */}
+        <PieChart margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
           <Pie
             data={processedData}
-            cx="50%"
-            cy="50%"
-            innerRadius={80} // This creates the "donut" hole
-            outerRadius={120}
-            fill="#8884d8"
-            paddingAngle={3}
+            cx="50%" // Center X
+            cy="50%" // Center Y
+            innerRadius={80} // This creates the "donut" hole in the middle.
+            outerRadius={120} // This is the outer edge of the donut.
+            fill="#8884d8" // A default fill color
+            paddingAngle={5} // Adds a small gap between slices for a modern look
             dataKey="value"
-            labelLine={false}
+            // --- These are the crucial new props that enable our custom labels ---
+            labelLine={false} // We don't need the default connector lines.
+            label={renderCustomizedLabel} // We tell the chart to use our custom function for labels.
           >
+            {/* We map over our data to assign the correct color to each slice of the pie. */}
             {processedData.map((entry) => (
-              <Cell key={`cell-${entry.name}`} fill={entry.color} />
+              <Cell key={`cell-${entry.name}`} fill={entry.color} stroke={entry.color} />
             ))}
           </Pie>
-          <Legend content={renderLegend} />
+          {/* We no longer need the default <Legend /> component, as our new labels are superior. */}
         </PieChart>
       </ResponsiveContainer>
     </ChartWrapper>

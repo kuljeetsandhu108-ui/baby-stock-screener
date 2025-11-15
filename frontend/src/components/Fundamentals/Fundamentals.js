@@ -254,7 +254,7 @@ const Fundamentals = ({
                 <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6, marginTop: '-1rem', marginBottom: '1.5rem' }}>
                   A momentum strategy that identifies stocks consolidating in a narrow price range ("box") near their 52-week high.
                 </p>
-                <DarvasScan scanData={darvasScanData} />
+                <DarvasScan scanData={darvasScanData} currency={profile?.currency} />
             </SectionContainer>
         </NestedTabPanel>
 
