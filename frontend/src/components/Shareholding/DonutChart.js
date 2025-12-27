@@ -1,71 +1,116 @@
 import React from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { FaChartPie } from 'react-icons/fa'; // Import an icon for the placeholder
 
 // --- Styled Components ---
+
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
+`;
 
 const ChartWrapper = styled.div`
   width: 100%;
   height: 350px;
+  position: relative;
 `;
 
-// --- The New, Intelligent, "Display-Only" React Component ---
+// --- NEW: Beautiful Placeholder Styles ---
+const PlaceholderContainer = styled.div`
+  width: 100%;
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  padding: 2rem;
+  text-align: center;
+  animation: ${fadeIn} 0.5s ease-in;
+`;
 
-// The component now accepts the clean 'breakdown' object from our new backend engine.
+const PlaceholderIcon = styled.div`
+  font-size: 3rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+  opacity: 0.5;
+`;
+
+const PlaceholderTitle = styled.h4`
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem;
+`;
+
+const DisclaimerText = styled.p`
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  max-width: 80%;
+  margin: 0 auto;
+  font-style: italic;
+`;
+
+// --- The Upgraded React Component ---
+
 const DonutChart = ({ breakdown }) => {
-  // Define our professional, high-contrast color palette.
+  // Define our professional color palette.
   const COLORS = {
     Promoter: '#3B82F6', // Blue
     FII: '#10B981',      // Green
     DII: '#F59E0B',      // Amber/Yellow
-    Public: '#EF4444',     // Red
+    Public: '#EF4444',   // Red
   };
 
-  // If the breakdown data is missing or incomplete, we show a clear, informative message.
-  // We check for 'public' because our reliable Yahoo Finance source will always provide it.
-  if (!breakdown || Object.keys(breakdown).length === 0 || breakdown.public === undefined) {
+  // --- LOGIC CHECK: Do we have valid data? ---
+  // If breakdown is missing, empty, or has 'public' as undefined, we treat it as missing.
+  const hasData = breakdown && Object.keys(breakdown).length > 0 && breakdown.public !== undefined;
+
+  // If NO data, render the beautiful placeholder
+  if (!hasData) {
       return (
-          <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <p>Shareholding breakdown is not available.</p>
-          </div>
+          <PlaceholderContainer>
+              <PlaceholderIcon>
+                  <FaChartPie />
+              </PlaceholderIcon>
+              <PlaceholderTitle>Data Coming Soon</PlaceholderTitle>
+              <DisclaimerText>
+                  Detailed shareholding patterns for this specific region are currently being integrated into our system. 
+                  <br />
+                  This section is a placeholder and will be updated automatically once the data source is live.
+              </DisclaimerText>
+          </PlaceholderContainer>
       );
   }
 
-  // --- Data Processing ---
-  // We transform the breakdown object from our backend into the array format
-  // that the 'recharts' library expects.
-  // We also filter out any categories that have a zero or negligible percentage to keep the chart clean.
+  // --- Data Processing (Only runs if we have data) ---
   const chartData = [
     { name: 'Promoter', value: breakdown.promoter, color: COLORS.Promoter },
     { name: 'FII', value: breakdown.fii, color: COLORS.FII },
     { name: 'DII', value: breakdown.dii, color: COLORS.DII },
     { name: 'Public', value: breakdown.public, color: COLORS.Public },
-  ].filter(entry => entry.value > 0.01); // Filter out tiny or zero-value slices
+  ].filter(entry => entry.value > 0.01);
 
-
-  // --- The Intelligent Custom Label Renderer ---
-  // This powerful function gives us pixel-perfect control over the label's appearance and position.
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-    // This is the standard mathematical formula to find a point on a circle's edge.
     const RADIAN = Math.PI / 180;
-    // We place the label slightly outside the donut for a cleaner, more professional look.
     const radius = outerRadius * 1.4; 
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
     return (
-      // The <text> element is an SVG element that allows us to draw text directly onto the chart canvas.
       <text
         x={x}
         y={y}
         fill="var(--color-text-primary)"
-        // This logic ensures the text is always aligned away from the chart's center for readability.
         textAnchor={x > cx ? 'start' : 'end'}
         dominantBaseline="central"
         fontSize="14px"
         fontWeight="600"
       >
-        {/* We display the category name and its calculated percentage, formatted to one decimal place. */}
         {`${name} ${(percent * 100).toFixed(1)}%`}
       </text>
     );
@@ -74,22 +119,20 @@ const DonutChart = ({ breakdown }) => {
   return (
     <ChartWrapper>
       <ResponsiveContainer>
-        {/* We add a margin around the chart to ensure our external labels have enough space and are not cut off. */}
         <PieChart margin={{ top: 40, right: 40, bottom: 40, left: 40 }}>
           <Pie
             data={chartData}
-            cx="50%" // Center the pie horizontally
-            cy="50%" // Center the pie vertically
-            innerRadius={80} // This creates the "donut" hole in the middle.
-            outerRadius={120} // This is the outer edge of the donut slices.
-            fill="#8884d8" // A default fill color, which will be overridden by our <Cell> components.
-            paddingAngle={5} // Adds a small, visually appealing gap between slices.
-            dataKey="value" // Tells the chart that the 'value' property should determine the slice size.
-            nameKey="name" // Tells the chart that the 'name' property should be used for labels.
-            labelLine={false} // We don't need the default connector lines from the slice to the label.
-            label={renderCustomizedLabel} // We tell the chart to use our custom function for rendering labels.
+            cx="50%"
+            cy="50%"
+            innerRadius={80}
+            outerRadius={120}
+            fill="#8884d8"
+            paddingAngle={5}
+            dataKey="value"
+            nameKey="name"
+            labelLine={false}
+            label={renderCustomizedLabel}
           >
-            {/* We map over our data to assign the correct, beautiful color to each slice of the pie. */}
             {chartData.map((entry) => (
               <Cell key={`cell-${entry.name}`} fill={entry.color} stroke={entry.color} />
             ))}

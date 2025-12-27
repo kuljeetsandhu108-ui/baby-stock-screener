@@ -1,17 +1,8 @@
 import React from 'react';
 import styled from 'styled-components';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Label
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Label
 } from 'recharts';
-
-// --- Styled Components ---
 
 const PriceTargetContainer = styled.div`
   width: 100%;
@@ -49,39 +40,34 @@ const ChartWrapper = styled.div`
   width: 100%;
 `;
 
-// --- NEW: The same intelligent currency helper function from our StockHeader ---
 const getCurrencySymbol = (currencyCode) => {
     switch (currencyCode) {
-        case 'INR':
-            return '₹';
-        case 'USD':
-            return '$';
-        case 'JPY':
-            return '¥';
-        // We can add more currencies like EUR, GBP etc. as needed in the future
-        default:
-            return '$'; // Default to dollar if the currency code is unknown or missing
+        case 'INR': return '₹';
+        case 'USD': return '$';
+        case 'JPY': return '¥';
+        default: return '$'; 
     }
 };
 
-// --- The Upgraded, Currency-Aware React Component ---
+// **CRITICAL FIX**: Crash-proof number formatter
+const safeFixed = (val, decimals = 2) => {
+  if (val === undefined || val === null || isNaN(val)) return 'N/A';
+  return val.toFixed(decimals);
+};
 
-// The component now accepts the 'currency' prop from its parent.
 const PriceTarget = ({ consensus, quote, currency }) => {
 
-  // Defensive check: If essential data is missing, we show an informative message.
-  if (!consensus || !quote || !consensus.targetConsensus) {
+  // **CRITICAL FIX**: Validate numeric data before rendering
+  if (!consensus || !quote || typeof consensus.targetConsensus !== 'number' || typeof quote.price !== 'number') {
     return (
       <PriceTargetContainer>
         <SectionTitle>Price Target</SectionTitle>
-        <p>Price target data is not available for this stock.</p>
+        <p style={{color: 'var(--color-text-secondary)'}}>Price target data is not available for this stock.</p>
       </PriceTargetContainer>
     );
   }
   
-  // --- Get the correct currency symbol based on the data received ---
   const currencySymbol = getCurrencySymbol(currency);
-
   const { targetHigh, targetLow, targetConsensus } = consensus;
   const currentPrice = quote.price;
 
@@ -89,13 +75,11 @@ const PriceTarget = ({ consensus, quote, currency }) => {
   const changePercent = (change / currentPrice) * 100;
   const isPositive = change >= 0;
 
-  // Data for the simple line chart visualization
   const chartData = [
     { name: 'Current', value: currentPrice },
     { name: '1Y Forecast', value: targetConsensus },
   ];
   
-  // A custom tooltip for better styling that also includes the currency symbol
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -105,7 +89,7 @@ const PriceTarget = ({ consensus, quote, currency }) => {
           padding: '1rem',
           borderRadius: '8px'
         }}>
-          <p>{`${label}: ${currencySymbol}${payload[0].value.toFixed(2)}`}</p>
+          <p>{`${label}: ${currencySymbol}${safeFixed(payload[0].value)}`}</p>
         </div>
       );
     }
@@ -116,13 +100,12 @@ const PriceTarget = ({ consensus, quote, currency }) => {
     <PriceTargetContainer>
       <SectionTitle>Price Target</SectionTitle>
       
-      {/* --- All displayed values now use the dynamic currency symbol --- */}
-      <PriceDisplay>{currencySymbol}{targetConsensus?.toFixed(2)}</PriceDisplay>
+      <PriceDisplay>{currencySymbol}{safeFixed(targetConsensus)}</PriceDisplay>
       <PriceChange isPositive={isPositive}>
-          {isPositive ? '+' : ''}{currencySymbol}{change.toFixed(2)} ({isPositive ? '+' : ''}{changePercent.toFixed(2)}%)
+          {isPositive ? '+' : ''}{currencySymbol}{safeFixed(change)} ({isPositive ? '+' : ''}{safeFixed(changePercent)}%)
       </PriceChange>
       <SummaryText>
-        The analysts offering 1-year price forecasts have a max estimate of {currencySymbol}{targetHigh?.toFixed(2)} and a min estimate of {currencySymbol}{targetLow?.toFixed(2)}.
+        The analysts offering 1-year price forecasts have a max estimate of {currencySymbol}{safeFixed(targetHigh)} and a min estimate of {currencySymbol}{safeFixed(targetLow)}.
       </SummaryText>
 
       <ChartWrapper>
@@ -131,26 +114,30 @@ const PriceTarget = ({ consensus, quote, currency }) => {
             <XAxis dataKey="name" stroke="var(--color-text-secondary)" tick={{ fill: 'var(--color-text-secondary)' }} />
             <YAxis 
                 stroke="var(--color-text-secondary)" 
-                domain={['dataMin - 20', 'dataMax + 20']}
+                domain={['auto', 'auto']}
                 tick={{ fill: 'var(--color-text-secondary)' }}
-                tickFormatter={(tick) => `${currencySymbol}${tick}`} // Add currency to the axis
+                tickFormatter={(tick) => `${currencySymbol}${tick}`}
             />
             <Tooltip content={<CustomTooltip />} />
             
             <Line type="monotone" dataKey="value" stroke="var(--color-primary)" strokeWidth={2} dot={{ r: 4 }} />
 
-            {/* Reference lines now also include the dynamic currency symbol */}
-            <ReferenceLine y={targetHigh} stroke="var(--color-success)" strokeDasharray="3 3">
-                <Label value={`Max: ${currencySymbol}${targetHigh.toFixed(2)}`} position="right" fill="var(--color-success)" />
-            </ReferenceLine>
-            <ReferenceLine y={targetLow} stroke="var(--color-danger)" strokeDasharray="3 3">
-                <Label value={`Min: ${currencySymbol}${targetLow.toFixed(2)}`} position="right" fill="var(--color-danger)" />
-            </ReferenceLine>
+            {/* Only render lines if data exists */}
+            {targetHigh && (
+                <ReferenceLine y={targetHigh} stroke="var(--color-success)" strokeDasharray="3 3">
+                    <Label value={`Max: ${currencySymbol}${safeFixed(targetHigh)}`} position="right" fill="var(--color-success)" />
+                </ReferenceLine>
+            )}
+            {targetLow && (
+                <ReferenceLine y={targetLow} stroke="var(--color-danger)" strokeDasharray="3 3">
+                    <Label value={`Min: ${currencySymbol}${safeFixed(targetLow)}`} position="right" fill="var(--color-danger)" />
+                </ReferenceLine>
+            )}
             <ReferenceLine y={targetConsensus} stroke="var(--color-primary)" strokeDasharray="3 3">
-                <Label value={`Avg: ${currencySymbol}${targetConsensus.toFixed(2)}`} position="right" fill="var(--color-primary)" />
+                <Label value={`Avg: ${currencySymbol}${safeFixed(targetConsensus)}`} position="right" fill="var(--color-primary)" />
             </ReferenceLine>
             <ReferenceLine y={currentPrice} stroke="#fff" strokeDasharray="1 1">
-                <Label value={`Current: ${currencySymbol}${currentPrice.toFixed(2)}`} position="left" fill="#fff" />
+                <Label value={`Current: ${currencySymbol}${safeFixed(currentPrice)}`} position="left" fill="#fff" />
             </ReferenceLine>
             
           </LineChart>

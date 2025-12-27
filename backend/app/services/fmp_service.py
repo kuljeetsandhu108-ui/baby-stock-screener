@@ -1,195 +1,304 @@
 import os
 import requests
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 FMP_API_KEY = os.getenv("FMP_API_KEY")
 BASE_URL = "https://financialmodelingprep.com/api/v3"
+BASE_URL_V4 = "https://financialmodelingprep.com/api/v4"
+
+# ==========================================
+# 1. CORE COMPANY DATA
+# ==========================================
 
 def get_company_profile(symbol: str):
-    """Fetches the company profile (description, industry, etc.) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches company profile (description, industry, CEO, etc.).
+    """
+    if not FMP_API_KEY: return {}
     try:
         url = f"{BASE_URL}/profile/{symbol}?apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching company profile for {symbol}: {e}")
-        return []
+        data = response.json()
+        return data[0] if data and isinstance(data, list) else {}
+    except Exception as e:
+        print(f"FMP Profile Error for {symbol}: {e}")
+        return {}
 
 def get_quote(symbol: str):
-    """Fetches the latest quote data (price, change, volume, etc.) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches real-time price, change, and volume.
+    """
+    if not FMP_API_KEY: return {}
     try:
         url = f"{BASE_URL}/quote/{symbol}?apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching quote for {symbol}: {e}")
-        return []
+        data = response.json()
+        return data[0] if data and isinstance(data, list) else {}
+    except Exception as e:
+        print(f"FMP Quote Error for {symbol}: {e}")
+        return {}
+
+# ==========================================
+# 2. FINANCIALS & FUNDAMENTALS
+# ==========================================
 
 def get_financial_statements(symbol: str, statement_type: str, period: str = "annual", limit: int = 5):
-    """Fetches financial statements (income-statement, balance-sheet, cash-flow) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches Income Statement, Balance Sheet, or Cash Flow.
+    statement_type options: 'income-statement', 'balance-sheet-statement', 'cash-flow-statement'
+    """
+    if not FMP_API_KEY: return []
     try:
         url = f"{BASE_URL}/{statement_type}/{symbol}?period={period}&limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching {statement_type} for {symbol}: {e}")
+    except Exception:
         return []
 
 def get_key_metrics(symbol: str, period: str = "annual", limit: int = 5):
-    """Fetches key metrics (P/E, P/B, Market Cap, ROE, etc.) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches key valuation metrics (P/E, P/B, ROE, etc.).
+    """
+    if not FMP_API_KEY: return []
     try:
         url = f"{BASE_URL}/key-metrics/{symbol}?period={period}&limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching key metrics for {symbol}: {e}")
+    except Exception:
         return []
 
 def get_financial_ratios(symbol: str, period: str = "annual", limit: int = 5):
-    """Fetches detailed financial ratios (current ratio, debt to equity, etc.) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches advanced financial ratios.
+    """
+    if not FMP_API_KEY: return []
     try:
         url = f"{BASE_URL}/ratios/{symbol}?period={period}&limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching financial ratios for {symbol}: {e}")
+    except Exception:
         return []
 
+# ==========================================
+# 3. ANALYST & INSIDER DATA
+# ==========================================
+
 def get_analyst_ratings(symbol: str, limit: int = 100):
-    """Fetches analyst ratings and recommendations from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches Buy/Sell/Hold ratings.
+    """
+    if not FMP_API_KEY: return []
     try:
         url = f"{BASE_URL}/rating/{symbol}?limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching analyst ratings for {symbol}: {e}")
+    except Exception:
         return []
 
-def get_shareholding_data(symbol: str, limit: int = 100):
-    """Fetches the current list of institutional shareholders from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
-    try:
-        url = f"{BASE_URL}/institutional-holder/{symbol}?limit={limit}&apikey={FMP_API_KEY}"
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching shareholding data for {symbol}: {e}")
-        return []
-    
 def get_analyst_estimates(symbol: str, limit: int = 1):
-    """Fetches analyst earnings estimates for the upcoming quarter from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches revenue and EPS estimates.
+    """
+    if not FMP_API_KEY: return {}
     try:
         url = f"{BASE_URL}/analyst-estimates/{symbol}?limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
-        return response.json()[0] if response.json() else {}
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching analyst estimates for {symbol}: {e}")
+        data = response.json()
+        return data[0] if data else {}
+    except Exception:
         return {}
 
 def get_price_target_consensus(symbol: str):
-    """Fetches the price target consensus (high, low, average) from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+    """
+    Fetches high, low, and average price targets.
+    """
+    if not FMP_API_KEY: return {}
     try:
         url = f"{BASE_URL}/price-target-consensus/{symbol}?apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
-        return response.json()[0] if response.json() else {}
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching price target consensus for {symbol}: {e}")
+        data = response.json()
+        return data[0] if data else {}
+    except Exception:
         return {}
 
-def get_technical_indicators(symbol: str, period: int = 14):
-    """Fetches a wide range of daily technical indicators from FMP."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
+def get_shareholding_data(symbol: str, limit: int = 100):
+    """
+    Fetches institutional holders.
+    """
+    if not FMP_API_KEY: return []
     try:
-        url = f"{BASE_URL}/technical_indicator/daily/{symbol}?period={period}&apikey={FMP_API_KEY}"
+        url = f"{BASE_URL}/institutional-holder/{symbol}?limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
-        return response.json()[0] if response.json() else {}
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching technical indicators for {symbol}: {e}")
-        return {}
-
-def get_historical_institutional_ownership(symbol: str, limit: int = 8):
-    """Fetches the quarterly historical ownership data for institutional investors."""
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
-    try:
-        url = f"{BASE_URL}/institutional-ownership/symbol-ownership?symbol={symbol}&include_current_quarter=true&limit={limit}&apikey={FMP_API_KEY}"
-        response = requests.get(url)
-        response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching historical institutional ownership for {symbol}: {e}")
+    except Exception:
+        return []
+
+# ==========================================
+# 4. PEER COMPARISON (UPDATED)
+# ==========================================
+
+def get_stock_peers(symbol: str):
+    """
+    Fetches the official peer list from FMP v4 API.
+    """
+    if not FMP_API_KEY: return []
+    try:
+        url = f"{BASE_URL_V4}/stock_peers?symbol={symbol}&apikey={FMP_API_KEY}"
+        response = requests.get(url)
+        data = response.json()
+        # API returns: [{"peersList": ["AAPL", "MSFT", ...]}]
+        if data and isinstance(data, list) and 'peersList' in data[0]:
+            return data[0]['peersList']
+        return []
+    except Exception:
         return []
 
 def get_peers_with_metrics(symbols: list):
     """
-    This is now a utility function. It takes a LIST of symbols
-    and fetches key metrics for all of them in a single, efficient batch call.
+    Efficiently fetches metrics for multiple companies in ONE API call.
+    Uses TTM (Trailing Twelve Months) for best comparison.
     """
-    if not FMP_API_KEY:
-        return {"error": "FMP API key not found."}
-    if not symbols:
-        return []
-        
+    if not FMP_API_KEY or not symbols: return []
     try:
-        # The FMP API allows for comma-separated symbols for high efficiency.
         symbols_str = ",".join(symbols)
-        
-        # We use the key-metrics-ttm endpoint to get the latest trailing-twelve-months data.
-        metrics_url = f"{BASE_URL}/key-metrics-ttm/{symbols_str}?apikey={FMP_API_KEY}"
-        metrics_response = requests.get(metrics_url)
-        metrics_response.raise_for_status()
-        
-        return metrics_response.json()
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching peers metrics for symbols {symbols_str}: {e}")
+        url = f"{BASE_URL}/key-metrics-ttm/{symbols_str}?apikey={FMP_API_KEY}"
+        response = requests.get(url)
+        return response.json()
+    except Exception:
         return []
 
-# ... (keep all existing functions)
+# ==========================================
+# 5. SEARCH & NEWS
+# ==========================================
 
 def search_ticker(query: str, limit: int = 10):
     """
-    Searches for a stock ticker based on a query string.
-    Used for the frontend autocomplete dropdown.
+    Used for the Search Bar autocomplete.
     """
-    if not FMP_API_KEY:
-        return []
+    if not FMP_API_KEY: return []
     try:
-        # The search endpoint is very fast and lightweight
         url = f"{BASE_URL}/search?query={query}&limit={limit}&apikey={FMP_API_KEY}"
         response = requests.get(url)
-        response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error searching for ticker '{query}': {e}")
+    except Exception:
+        return []
+
+def get_stock_news(symbol: str, limit: int = 10):
+    """
+    Fetches specific news for a stock.
+    """
+    if not FMP_API_KEY: return []
+    try:
+        url = f"{BASE_URL}/stock_news?tickers={symbol}&limit={limit}&apikey={FMP_API_KEY}"
+        response = requests.get(url)
+        return response.json()
+    except Exception:
+        return []
+
+# ==========================================
+# 6. CHARTING ENGINE (HIGH PERFORMANCE)
+# ==========================================
+
+def get_historical_candles(symbol: str, timeframe: str = "1D"):
+    """
+    Fetches OHLCV candles specifically formatted for the Lightweight Charts frontend.
+    
+    INTELLIGENT ROUTING:
+    - If timeframe is 5M, 15M, 1H, 4H -> Uses FMP Intraday API.
+    - If timeframe is 1D -> Uses FMP Daily Historical API.
+    
+    Returns:
+    - List of { time: UnixTimestamp, open, high, low, close, volume }
+    - Sorted Oldest -> Newest (ready for chart).
+    """
+    if not FMP_API_KEY: return []
+    
+    try:
+        # 1. Map Frontend Timeframe to FMP Endpoint
+        endpoint = ""
+        is_intraday = True
+        
+        # FMP supports: 1min, 5min, 15min, 30min, 1hour, 4hour
+        if timeframe == "5M":
+            endpoint = f"historical-chart/5min/{symbol}"
+        elif timeframe == "15M":
+            endpoint = f"historical-chart/15min/{symbol}"
+        elif timeframe == "30M":
+            endpoint = f"historical-chart/30min/{symbol}"
+        elif timeframe == "1H":
+            endpoint = f"historical-chart/1hour/{symbol}"
+        elif timeframe == "4H":
+            endpoint = f"historical-chart/4hour/{symbol}"
+        else:
+            # Default to Daily (Handles 1D, 1W, 1M, 1Y views via zooming)
+            is_intraday = False
+            endpoint = f"historical-price-full/{symbol}"
+
+        url = f"{BASE_URL}/{endpoint}?apikey={FMP_API_KEY}"
+        
+        # Optimize Daily fetch: limit to last 3 years to keep response fast
+        if not is_intraday:
+            start_date = (datetime.now() - timedelta(days=1095)).strftime('%Y-%m-%d')
+            url += f"&from={start_date}"
+
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        # 2. Extract specific list based on endpoint type
+        # Intraday returns list directly: [...]
+        # Daily returns object: { symbol: 'AAP', historical: [...] }
+        raw_candles = data if is_intraday else data.get('historical', [])
+        
+        if not raw_candles:
+            return []
+
+        formatted_data = []
+        
+        # 3. Process and Format Data
+        for candle in raw_candles:
+            date_str = candle.get('date')
+            
+            # FMP Date Formats:
+            # Intraday: "2025-11-08 10:30:00"
+            # Daily: "2025-11-08"
+            
+            try:
+                if is_intraday:
+                    # Parse full datetime string
+                    dt_obj = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                else:
+                    # Parse date string and set time to midnight UTC (standard for daily charts)
+                    dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                # Convert to Unix Timestamp (Seconds)
+                timestamp = int(dt_obj.timestamp())
+
+                formatted_data.append({
+                    "time": timestamp,
+                    "open": candle.get('open'),
+                    "high": candle.get('high'),
+                    "low": candle.get('low'),
+                    "close": candle.get('close'),
+                    "volume": candle.get('volume')
+                })
+            except ValueError:
+                # Skip malformed dates
+                continue
+
+        # 4. Sort: FMP usually sends Newest First. Charts need Oldest First.
+        formatted_data.sort(key=lambda x: x['time'])
+        
+        return formatted_data
+
+    except Exception as e:
+        print(f"Error fetching FMP candles for {symbol} ({timeframe}): {e}")
         return []
